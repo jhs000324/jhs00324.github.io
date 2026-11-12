@@ -1,0 +1,2600 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KakaoTalk Chattiness & Dynamics Engine (Argon Pro Edition)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- html2canvas (요약 리포트 PNG 캡처용) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Pretendard Font -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto', 'sans-serif'],
+                    },
+                    colors: {
+                        kakao: {
+                            yellow: '#FEE500',
+                            brown: '#3C1E1E',
+                            dark: '#181600'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.4);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(100, 116, 139, 0.5);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.8);
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.72);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        html:not(.dark) .glass-card {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+        }
+        .matrix-cell {
+            transition: all 0.15s ease;
+        }
+        .matrix-cell:hover {
+            transform: scale(1.03);
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans min-h-screen transition-colors duration-200">
+
+    <!-- 상단 알림 토스트 (alert 대체용) -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+    <!-- 상단 헤더 -->
+    <header class="sticky top-0 z-40 border-b border-slate-200 dark:border-slate-800/80 bg-white/85 dark:bg-slate-950/85 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-kakao-yellow flex items-center justify-center text-kakao-brown shadow-md shadow-yellow-500/10 shrink-0">
+                    <i class="fa-solid fa-comments text-xl"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-extrabold text-base sm:text-xl tracking-tight">카톡 수다력 & 케미 분석기</h1>
+                        <span class="px-2 py-0.5 text-[11px] font-bold rounded-full bg-kakao-yellow/20 text-amber-600 dark:text-kakao-yellow border border-kakao-yellow/30">
+                            Argon Pro
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
+                        표준 CCI 수다력 지수 · 티키타카 응답 행렬 · 단톡방 기네스북 · 마라톤 키워드 엔진
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 sm:gap-2.5">
+                <!-- 개인정보 보호 배지 -->
+                <div class="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>100% 브라우저 로컬 처리 (서버 전송 없음)</span>
+                </div>
+
+                <!-- 리포트 PNG 이미지 캡처 버튼 -->
+                <button onclick="captureReportImage()" class="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm transition-all flex items-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-camera"></i>
+                    <span class="hidden sm:inline">요약 리포트 PNG 저장</span>
+                </button>
+
+                <!-- 샘플 데이터 버튼 -->
+                <button id="btn-sample" onclick="loadSampleData()" class="px-3 py-2 rounded-xl bg-kakao-yellow hover:bg-yellow-300 text-kakao-brown font-bold text-xs sm:text-sm transition-all flex items-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-flask"></i>
+                    <span>멀티시즌 데모 데이터</span>
+                </button>
+
+                <!-- 다크/라이트 모드 토글 -->
+                <button onclick="toggleTheme()" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors" title="테마 변경">
+                    <i id="theme-icon" class="fa-solid fa-sun text-sm"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 컨테이너 -->
+    <main id="dashboard-capture-area" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- 1. 원클릭 파일 업로드 & 표준 알고리즘 안내 배너 -->
+        <section class="glass-card rounded-2xl p-5 sm:p-6">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                <!-- 좌측: 타이틀 및 알고리즘 기준 요약 설명 (5 cols) -->
+                <div class="lg:col-span-5 space-y-3">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span id="current-file-badge" class="text-xs px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-kakao-yellow border border-amber-500/30 font-semibold">
+                            분석 준비 완료
+                        </span>
+                        <span id="current-period-badge" class="text-xs px-2.5 py-1 rounded-full bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+                            기간: -
+                        </span>
+                    </div>
+
+                    <h2 class="font-extrabold text-lg sm:text-xl tracking-tight leading-snug">
+                        단톡방에서 <span class="text-amber-500 dark:text-kakao-yellow underline decoration-wavy decoration-amber-500/40 underline-offset-4">진짜 수다 지분 1위</span>와 <span class="text-sky-400">소울메이트</span>는?
+                    </h2>
+
+                    <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                        "ㅋㅋㅋ"처럼 엔터키로 끊어 치는 단문 연타 착시를 제거하기 위해 <strong>표준 Argon CCI 수식</strong>이 유효 정보량·대화 턴·선톡 기여도를 종합 평가합니다.
+                    </p>
+
+                    <!-- 고정된 산출 기준 뱃지형 요약 -->
+                    <div class="pt-1 flex flex-wrap gap-1.5 text-[11px]">
+                        <span class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+                            <i class="fa-solid fa-font text-amber-500 mr-1"></i>유효 글자량 <strong>45%</strong>
+                        </span>
+                        <span class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+                            <i class="fa-solid fa-repeat text-sky-400 mr-1"></i>대화 턴(연타보정) <strong>30%</strong>
+                        </span>
+                        <span class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+                            <i class="fa-solid fa-comment-dots text-purple-400 mr-1"></i>메시지 수 <strong>15%</strong>
+                        </span>
+                        <span class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+                            <i class="fa-solid fa-bolt text-emerald-400 mr-1"></i>선톡(6시간 공백) <strong>10%</strong>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 우측: 드래그 앤 드롭 업로드 존 (7 cols) -->
+                <div class="lg:col-span-7 flex flex-col gap-2">
+                    <label id="drop-zone" for="file-input" class="cursor-pointer border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-amber-500 dark:hover:border-kakao-yellow rounded-2xl p-5 sm:p-6 text-center transition-all flex flex-col sm:flex-row items-center justify-center gap-4 bg-slate-100/60 dark:bg-slate-900/50 group">
+                        <div class="w-14 h-14 rounded-2xl bg-amber-500/10 group-hover:bg-amber-500/20 flex items-center justify-center text-amber-500 dark:text-kakao-yellow transition-transform group-hover:scale-105 shrink-0">
+                            <i class="fa-solid fa-cloud-arrow-up text-2xl"></i>
+                        </div>
+                        <div class="text-center sm:text-left space-y-1">
+                            <p class="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100">
+                                카카오톡 대화 내보내기 파일(<code class="text-amber-600 dark:text-kakao-yellow font-mono">.txt</code>, <code class="text-amber-600 dark:text-kakao-yellow font-mono">.csv</code>) 업로드
+                            </p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">
+                                클릭하여 파일을 선택하거나 끌어다 놓으세요 (PC Windows / macOS / iOS / Android 자동 인식)
+                            </p>
+                        </div>
+                        <input id="file-input" type="file" accept=".txt,.csv" class="hidden" onchange="handleFileSelect(event)">
+                    </label>
+
+                    <div class="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-400">
+                        <span><i class="fa-solid fa-wand-magic-sparkles mr-1 text-amber-400"></i>반복 자모음(ㅋㅋㅋㅋ→ㅋㅋ) 압축 및 한국어 조사/불용어 제거 엔진 내장</span>
+                        <button onclick="openRawModal()" class="text-amber-600 dark:text-kakao-yellow hover:underline font-semibold">
+                            대화 텍스트 직접 붙여넣기 <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 1.5. 프라이버시 이름 마스킹 & 분석 참여자 필터 바 -->
+        <section class="glass-card rounded-2xl p-4 sm:px-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-l-4 border-l-indigo-500">
+            <!-- 좌측: 프라이버시 이름 가리기 모드 -->
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200">
+                    <i class="fa-solid fa-user-secret text-indigo-400 text-base"></i>
+                    <span>프라이버시 이름 가리기:</span>
+                </div>
+                <div class="inline-flex rounded-xl p-1 bg-slate-200/80 dark:bg-slate-900 border border-slate-300/60 dark:border-slate-800">
+                    <button id="privacy-btn-real" onclick="setPrivacyMode('real')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-kakao-yellow text-kakao-brown shadow-sm">
+                        <i class="fa-solid fa-id-card mr-1"></i>실명 표시
+                    </button>
+                    <button id="privacy-btn-masked" onclick="setPrivacyMode('masked')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                        <i class="fa-solid fa-mask mr-1"></i>성만 표시 (김OO)
+                    </button>
+                    <button id="privacy-btn-animal" onclick="setPrivacyMode('animal')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                        <i class="fa-solid fa-paw mr-1"></i>익명 동물 모드
+                    </button>
+                </div>
+            </div>
+
+            <!-- 우측: 분석 참여자 선택/제외 필터 (봇이나 나간 멤버 제외용) -->
+            <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-start lg:justify-end">
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 mr-1">
+                    <i class="fa-solid fa-users-gear mr-1 text-sky-400"></i>참여자 필터 (클릭 시 제외/포함):
+                </span>
+                <div id="participant-filter-pills" class="flex flex-wrap items-center gap-1.5">
+                    <!-- JS 동적 렌더링 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 명예의 전당 & 단톡방 기네스북 8대 어워드 (8-Card Grid) -->
+        <section class="space-y-3">
+            <div class="flex items-center justify-between px-1">
+                <h3 class="font-extrabold text-base sm:text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-trophy text-kakao-yellow"></i>
+                    <span>단톡방 명예의 전당 & 기네스북 8대 어워드</span>
+                </h3>
+                <span class="text-xs text-slate-500 dark:text-slate-400">대화 역학 & 행동 패턴 자동 분석</span>
+            </div>
+
+            <!-- Row 1: 4대 핵심 수다력 어워드 -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- 1. 최고의 투머치토커 (CCI 1위) -->
+                <div class="glass-card rounded-2xl p-4 border-l-4 border-l-kakao-yellow relative overflow-hidden">
+                    <div class="flex items-center justify-between text-xs mb-1.5">
+                        <span class="font-extrabold text-amber-500 dark:text-kakao-yellow">👑 최고의 투머치토커</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-500">종합 1위</span>
+                    </div>
+                    <div id="kpi-top-cci-user" class="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white truncate">-</div>
+                    <div id="kpi-top-cci-score" class="text-xs text-amber-600 dark:text-kakao-yellow font-bold mt-1">종합 수다력 지분: -%</div>
+                    <div id="kpi-top-cci-sub" class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">유효 글자 -자 · -턴 대화</div>
+                </div>
+
+                <!-- 2. 기관총 단타왕 (Burstiness 1위) -->
+                <div class="glass-card rounded-2xl p-4 border-l-4 border-l-rose-500">
+                    <div class="flex items-center justify-between text-xs mb-1.5">
+                        <span class="font-extrabold text-rose-500 dark:text-rose-400">🔫 기관총 단타왕</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-400">연타 1위</span>
+                    </div>
+                    <div id="kpi-top-burst-user" class="text-xl font-extrabold tracking-tight truncate">-</div>
+                    <div id="kpi-top-burst-score" class="text-xs text-rose-500 dark:text-rose-400 font-bold mt-1">1턴당 평균 -개 말풍선 연타</div>
+                    <div id="kpi-top-burst-sub" class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">엔터키를 숨 쉬듯 치는 스타일</div>
+                </div>
+
+                <!-- 3. 단톡방 산소호흡기 (선톡 1위) -->
+                <div class="glass-card rounded-2xl p-4 border-l-4 border-l-emerald-500">
+                    <div class="flex items-center justify-between text-xs mb-1.5">
+                        <span class="font-extrabold text-emerald-600 dark:text-emerald-400">⚡ 단톡방 산소호흡기</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400">선톡 1위</span>
+                    </div>
+                    <div id="kpi-top-starter-user" class="text-xl font-extrabold tracking-tight truncate">-</div>
+                    <div id="kpi-top-starter-score" class="text-xs text-emerald-600 dark:text-emerald-400 font-bold mt-1">전체 선톡의 -% 담당</div>
+                    <div id="kpi-top-starter-sub" class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">6시간 이상 침묵을 깬 횟수 -회</div>
+                </div>
+
+                <!-- 4. 24시간 상주 칼답러 (최단 답장 중앙값) -->
+                <div class="glass-card rounded-2xl p-4 border-l-4 border-l-purple-500">
+                    <div class="flex items-center justify-between text-xs mb-1.5">
+                        <span class="font-extrabold text-purple-600 dark:text-purple-400">🚀 24시간 상주 칼답러</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-400">속도 1위</span>
+                    </div>
+                    <div id="kpi-top-fast-user" class="text-xl font-extrabold tracking-tight truncate">-</div>
+                    <div id="kpi-top-fast-score" class="text-xs text-purple-600 dark:text-purple-400 font-bold mt-1">답장 속도 중앙값: -분</div>
+                    <div id="kpi-top-fast-sub" class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">카톡 알림 울리자마자 출동</div>
+                </div>
+            </div>
+
+            <!-- Row 2: 단톡방 기네스북 행동 패턴 어워드 4종 -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- 5. 프로 갑분싸러 (대화 종결자) -->
+                <div class="glass-card rounded-2xl p-4 border-l-4 border-l-cyan-400">
+                    <div class="flex items-center justify-between text-xs mb-1.5">
+                        <span class="font-extrabold text-cyan-600 dark:text-cyan-400">🥶 프로 갑분싸러 (종결자)</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/15 text-cyan-400">침묵 유발</span>
+                    </div>
+                    <div id="kpi-top-ender-user" class="text-xl font-extrabold tracking-tight truncate">-</div>
+                    <div id="kpi-top-ender-score" class="text-xs text-cyan-600 dark:text-cyan-400 font-bold mt-1">대화를 얼려버린 횟수: -회</div>
+                    <div id="kpi-top-ender-sub" class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">이 분의 말 이후 6시간 이상 정적</div>
+                </div>
+
+                <!-- 6. 새벽 감성 올빼미 (01~05시 심야 활동왕) -->
+                <div class="glass-card rounded-2xl p-4 border-l-4 border-l-indigo-400">
+                    <div class="flex items-center justify-between text-xs mb-1.5">
+                        <span class="font-extrabold text-indigo-600 dark:text-indigo-400">🦉 새벽 감성 올빼미</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-400">심야 01~05시</span>
+                    </div>
+                    <div id="kpi-top-owl-user" class="text-xl font-extrabold tracking-tight truncate">-</div>
+                    <div id="kpi-top-owl-score" class="text-xs text-indigo-600 dark:text-indigo-400 font-bold mt-1">새벽 시간대 발화: -건 (-%)</div>
+                    <div id="kpi-top-owl-sub" class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">모두가 잠든 밤에 깨어 있는 멤버</div>
+                </div>
+
+                <!-- 7. 단톡방 리액션 요정 (ㅋㅋㅋ/ㅎㅎ/ㅠㅠ 공감왕) -->
+                <div class="glass-card rounded-2xl p-4 border-l-4 border-l-pink-500">
+                    <div class="flex items-center justify-between text-xs mb-1.5">
+                        <span class="font-extrabold text-pink-600 dark:text-pink-400">🤣 단톡방 리액션 요정</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-pink-500/15 text-pink-400">웃음·공감왕</span>
+                    </div>
+                    <div id="kpi-top-react-user" class="text-xl font-extrabold tracking-tight truncate">-</div>
+                    <div id="kpi-top-react-score" class="text-xs text-pink-600 dark:text-pink-400 font-bold mt-1">웃음·감탄 리액션: -회</div>
+                    <div id="kpi-top-react-sub" class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">ㅋㅋㅋ·ㅎㅎ·ㅠㅠ·감탄사 지분 1위</div>
+                </div>
+
+                <!-- 8. 호기심 질문 폭격기 & 정보통 -->
+                <div class="glass-card rounded-2xl p-4 border-l-4 border-l-orange-400">
+                    <div class="flex items-center justify-between text-xs mb-1.5">
+                        <span class="font-extrabold text-orange-600 dark:text-orange-400">❓ 호기심 질문 & 정보통</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/15 text-orange-400">질문·링크 1위</span>
+                    </div>
+                    <div id="kpi-top-question-user" class="text-xl font-extrabold tracking-tight truncate">-</div>
+                    <div id="kpi-top-question-score" class="text-xs text-orange-600 dark:text-orange-400 font-bold mt-1">질문 -회 · 링크 공유 -건</div>
+                    <div id="kpi-top-question-sub" class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">단톡방 떡밥과 화제를 던지는 멤버</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. 🤝 티키타카 콤비 & 응답 케미 매트릭스 (Tiki-Taka Transition Matrix) -->
+        <section class="glass-card rounded-2xl p-5 sm:p-6 border border-sky-500/20">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 pb-4 border-b border-slate-200/70 dark:border-slate-800">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2.5 py-0.5 text-[11px] font-extrabold rounded-full bg-sky-500/15 text-sky-500 dark:text-sky-400 border border-sky-500/30">
+                            <i class="fa-solid fa-people-arrows mr-1"></i>TIKI-TAKA CHEMISTRY
+                        </span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400">동일 세션 내(30분 이내) 선행 발화자 → 후속 응답자 전이 확률 분석</span>
+                    </div>
+                    <h3 class="font-extrabold text-base sm:text-lg mt-1">
+                        누가 말하면 누가 가장 먼저 받아칠까? (티키타카 소울메이트 & 응답 행렬)
+                    </h3>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-5">
+                <!-- 좌측: 최고의 티키타카 콤비 TOP 3 & 짝사랑 레이더 (5 cols) -->
+                <div class="lg:col-span-5 flex flex-col justify-between space-y-4">
+                    <div class="space-y-2.5">
+                        <h4 class="text-xs sm:text-sm font-bold flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
+                            <i class="fa-solid fa-heart-pulse text-rose-500"></i>
+                            <span>최고의 티키타카 소울메이트 TOP 3 (쌍방향 핑퐁)</span>
+                        </h4>
+                        <div id="tiki-taka-top-pairs" class="space-y-2.5">
+                            <!-- JS 동적 렌더링 -->
+                        </div>
+                    </div>
+
+                    <!-- 비대칭 응답 (짝사랑 레이더) -->
+                    <div class="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-extrabold text-indigo-500 dark:text-indigo-400 flex items-center gap-1.5">
+                                <i class="fa-solid fa-satellite-dish"></i>
+                                <span>단톡방 짝사랑 레이더 (비대칭 응답 케미)</span>
+                            </span>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold">응답률 격차 분석</span>
+                        </div>
+                        <div id="tiki-taka-asymmetric" class="text-xs text-slate-700 dark:text-slate-200 leading-relaxed space-y-1.5">
+                            <!-- JS 동적 렌더링 -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 우측: 화자 간 응답 전이 히트맵 매트릭스 테이블 (7 cols) -->
+                <div class="lg:col-span-7 flex flex-col">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="text-xs sm:text-sm font-bold flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
+                            <i class="fa-solid fa-table-cells text-emerald-400"></i>
+                            <span>화자 간 응답 전이 확률 히트맵 (행: 먼저 말한 사람 → 열: 바로 대답한 사람)</span>
+                        </h4>
+                        <span class="text-[11px] text-slate-400">색이 진할수록 즉각 반응 확률 높음</span>
+                    </div>
+                    <div id="transition-matrix-container" class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900/60 p-3 flex-1 flex items-center justify-center">
+                        <!-- JS 동적 렌더링 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. 📈 월별/주별 대화 성수기 vs 빙하기 타임라인 -->
+        <section class="glass-card rounded-2xl p-5 sm:p-6">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
+                <div>
+                    <h3 class="font-extrabold text-base sm:text-lg flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-amber-500"></i>
+                        <span>단톡방 성수기 vs 빙하기 타임라인 (시계열 대화 볼륨 추이)</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                        시간 흐름에 따른 전체 말풍선 수와 티키타카 대화 턴 추이 및 대화가 가장 폭발했던 시기입니다.
+                    </p>
+                </div>
+
+                <!-- 성수기 & 빙하기 요약 배지 -->
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <div class="px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center gap-2 text-xs">
+                        <span class="font-extrabold text-rose-500 dark:text-rose-400"><i class="fa-solid fa-fire mr-1"></i>최대 성수기:</span>
+                        <span id="timeline-peak-badge" class="font-bold text-slate-800 dark:text-slate-100">-</span>
+                    </div>
+                    <div class="px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center gap-2 text-xs">
+                        <span class="font-extrabold text-cyan-600 dark:text-cyan-400"><i class="fa-solid fa-snowflake mr-1"></i>최대 빙하기(최장 침묵):</span>
+                        <span id="timeline-ice-badge" class="font-bold text-slate-800 dark:text-slate-100">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="relative h-[260px] w-full">
+                <canvas id="chart-monthly-timeline"></canvas>
+            </div>
+        </section>
+
+        <!-- 5. 🔥 대화가 가장 길게 이어진 순간 (Longest Rally Session) & 핵심 키워드 -->
+        <section class="glass-card rounded-2xl p-5 sm:p-6 border border-amber-500/20 relative overflow-hidden">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-200/70 dark:border-slate-800">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2.5 py-0.5 text-[11px] font-extrabold rounded-full bg-rose-500/15 text-rose-500 dark:text-rose-400 border border-rose-500/30">
+                            <i class="fa-solid fa-fire mr-1"></i>HOT RALLY MOMENT
+                        </span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400">60분 이상 끊기지 않고 티키타카가 이어진 연속 대화 기준</span>
+                    </div>
+                    <h3 class="font-extrabold text-base sm:text-lg mt-1 flex items-center gap-2">
+                        <span>대화가 가장 길게 폭발한 '레전드 마라톤 대화 순간' & 당시 키워드</span>
+                    </h3>
+                </div>
+
+                <!-- TOP 3 랠리 세션 선택 탭 -->
+                <div id="rally-tabs-container" class="flex flex-wrap items-center gap-2">
+                    <!-- JS 동적 렌더링 -->
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-5">
+                <!-- 좌측: 선택된 랠리 세션 메타데이터 & 핵심 키워드 점유율 (7 cols) -->
+                <div class="lg:col-span-7 flex flex-col justify-between space-y-4">
+                    <!-- 세션 요약 배너 -->
+                    <div class="p-4 rounded-2xl bg-slate-100/80 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800 space-y-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                                <span id="rally-rank-badge" class="px-2.5 py-1 rounded-lg bg-kakao-yellow text-kakao-brown font-extrabold text-xs">
+                                    #1 최장 마라톤 대화
+                                </span>
+                                <span id="rally-datetime" class="font-bold text-sm sm:text-base text-slate-800 dark:text-slate-100">
+                                    -
+                                </span>
+                            </div>
+                            <span id="rally-duration-badge" class="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-kakao-yellow font-bold text-xs border border-amber-500/30">
+                                연속 -분 대화
+                            </span>
+                        </div>
+
+                        <!-- 세션 수치 4종 -->
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-950/80 border border-slate-200/60 dark:border-slate-800/80">
+                                <div class="text-[11px] text-slate-400">주고받은 말풍선</div>
+                                <div id="rally-msg-count" class="text-sm sm:text-base font-extrabold text-amber-500 dark:text-kakao-yellow mt-0.5">-건</div>
+                            </div>
+                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-950/80 border border-slate-200/60 dark:border-slate-800/80">
+                                <div class="text-[11px] text-slate-400">티키타카 대화 턴</div>
+                                <div id="rally-turn-count" class="text-sm sm:text-base font-extrabold text-sky-400 mt-0.5">-턴</div>
+                            </div>
+                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-950/80 border border-slate-200/60 dark:border-slate-800/80">
+                                <div class="text-[11px] text-slate-400">이 순간의 수다 MVP</div>
+                                <div id="rally-mvp-user" class="text-sm sm:text-base font-extrabold text-rose-400 mt-0.5 truncate">-</div>
+                            </div>
+                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-950/80 border border-slate-200/60 dark:border-slate-800/80">
+                                <div class="text-[11px] text-slate-400">참여 멤버</div>
+                                <div id="rally-participants" class="text-xs font-bold text-emerald-400 mt-1 truncate">-명 참여</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 그 순간 가장 많이 언급된 핵심 키워드 -->
+                    <div class="space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs sm:text-sm font-bold flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
+                                <i class="fa-solid fa-tags text-amber-500"></i>
+                                <span>이 대화 순간을 달군 핵심 키워드 & 점유율</span>
+                            </h4>
+                            <span id="rally-keyword-summary" class="text-[11px] text-slate-400">상위 키워드 분석</span>
+                        </div>
+                        <div id="rally-keywords-list" class="flex flex-wrap gap-2">
+                            <!-- JS 렌더링 -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 우측: 당시 대화 하이라이트 스니펫 미리보기 (5 cols) -->
+                <div class="lg:col-span-5 flex flex-col">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="text-xs sm:text-sm font-bold flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
+                            <i class="fa-solid fa-comments text-sky-400"></i>
+                            <span>당시 대화 로그 하이라이트 (프라이버시 연동)</span>
+                        </h4>
+                        <span class="text-[11px] text-slate-400">피크 구간 발췌</span>
+                    </div>
+                    <div id="rally-chat-preview" class="flex-1 rounded-2xl bg-slate-200/70 dark:bg-slate-900/90 border border-slate-300/60 dark:border-slate-800 p-3.5 space-y-2 max-h-[260px] overflow-y-auto text-xs">
+                        <!-- JS 렌더링 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 6. 📊 전체 대화 키워드 점유율 & 화자별 최애 키워드 분석 -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- 좌측: 전체 키워드 점유율 TOP 15 차트 (6 cols) -->
+            <div class="lg:col-span-6 glass-card rounded-2xl p-5 flex flex-col">
+                <div class="flex items-center justify-between gap-2 mb-3">
+                    <div>
+                        <h3 class="font-bold text-base flex items-center gap-2">
+                            <i class="fa-solid fa-chart-pie text-amber-500"></i>
+                            <span>전체 대화 키워드 점유율 TOP 15</span>
+                        </h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">
+                            조사·어미·단순 감탄사를 제거한 뒤 단톡방에서 가장 많이 언급된 핵심 주제어 비중입니다.
+                        </p>
+                    </div>
+                    <span id="total-keywords-badge" class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-500 dark:text-kakao-yellow border border-amber-500/30 shrink-0">
+                        총 -개 키워드
+                    </span>
+                </div>
+                <div class="relative flex-1 min-h-[340px] w-full">
+                    <canvas id="chart-keyword-share"></canvas>
+                </div>
+            </div>
+
+            <!-- 우측: 키워드별 점유율 & 최다 언급자 랭킹 테이블 (6 cols) -->
+            <div class="lg:col-span-6 glass-card rounded-2xl p-5 flex flex-col">
+                <div class="mb-3">
+                    <h3 class="font-bold text-base flex items-center gap-2">
+                        <i class="fa-solid fa-magnifying-glass-chart text-sky-400"></i>
+                        <span>키워드별 점유율 및 '누가 제일 많이 썼을까?'</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                        전체 키워드 대비 점유율(%)과 해당 단어를 가장 많이 외친 지분 1위 멤버입니다.
+                    </p>
+                </div>
+
+                <div class="overflow-y-auto max-h-[340px] pr-1 -mr-1">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="sticky top-0 bg-white dark:bg-slate-900 z-10 border-b border-slate-200 dark:border-slate-800 text-slate-400">
+                            <tr>
+                                <th class="py-2 px-2.5">순위</th>
+                                <th class="py-2 px-2.5">키워드</th>
+                                <th class="py-2 px-2.5 text-right">언급 횟수</th>
+                                <th class="py-2 px-2.5 text-right">키워드 점유율</th>
+                                <th class="py-2 px-2.5">최다 언급자 (독점 지분)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="keyword-share-tbody" class="divide-y divide-slate-200/60 dark:divide-slate-800/70">
+                            <!-- JS 렌더링 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 7. 메인 수다력 비교 & 발화 스타일 포지셔닝 차트 그리드 -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- 차트 1: 화자별 종합 수다력(CCI) vs 단순 메시지수 vs 유효 글자수 비교 (7 cols) -->
+            <div class="lg:col-span-7 glass-card rounded-2xl p-5 flex flex-col">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                    <div>
+                        <h3 class="font-bold text-base flex items-center gap-2">
+                            <i class="fa-solid fa-chart-column text-amber-500"></i>
+                            <span>화자별 종합 수다력(CCI) vs 단순 메시지 비중 비교</span>
+                        </h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">
+                            단순 메시지 수(보라색)가 많아도 단답 연타가 많으면 실제 수다력 지수(노란색)는 객관적으로 보정됩니다.
+                        </p>
+                    </div>
+                </div>
+                <div class="relative flex-1 min-h-[300px] w-full">
+                    <canvas id="chart-cci-comparison"></canvas>
+                </div>
+            </div>
+
+            <!-- 차트 2: 화자 발화 스타일 매트릭스 (버스트 지수 vs 턴당 글자 수) (5 cols) -->
+            <div class="lg:col-span-5 glass-card rounded-2xl p-5 flex flex-col">
+                <div class="mb-4">
+                    <h3 class="font-bold text-base flex items-center gap-2">
+                        <i class="fa-solid fa-compass-drafting text-sky-400"></i>
+                        <span>발화 스타일 포지셔닝 맵 (Burst vs Density)</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                        X축: 턴당 평균 유효 글자 수 (장문 성향) / Y축: 버스트 지수 (연타 성향) / 원 크기: CCI 점수
+                    </p>
+                </div>
+                <div class="relative flex-1 min-h-[300px] w-full">
+                    <canvas id="chart-style-scatter"></canvas>
+                </div>
+                <div class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-center">
+                    <div class="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                        <strong>기관총 단타형</strong><br>짧게 여러 번 연타
+                    </div>
+                    <div class="p-1.5 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                        <strong>장문 논리형</strong><br>한 번에 긴 문단 전송
+                    </div>
+                    <div class="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        <strong>핵심 헤비토커</strong><br>장문 + 연타 모두 높음
+                    </div>
+                    <div class="p-1.5 rounded-lg bg-slate-500/10 text-slate-400 border border-slate-500/20">
+                        <strong>요약/리액션형</strong><br>짧고 간결한 단발 응답
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 8. 시간대별 활성도 & 답장 속도 차트 -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- 24시간 대화 활성도 분포 (7 cols) -->
+            <div class="lg:col-span-7 glass-card rounded-2xl p-5 flex flex-col">
+                <div class="mb-4">
+                    <h3 class="font-bold text-base flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-emerald-400"></i>
+                        <span>시간대별 대화 활성도 (00시 ~ 23시)</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                        단톡방이 가장 활발하게 불타오르는 피크 타임과 상위 화자들의 시간대별 출몰 비중입니다.
+                    </p>
+                </div>
+                <div class="relative flex-1 min-h-[250px] w-full">
+                    <canvas id="chart-hourly"></canvas>
+                </div>
+            </div>
+
+            <!-- 화자별 답장 속도 (반응 지연 중앙값) & 선톡 기여도 (5 cols) -->
+            <div class="lg:col-span-5 glass-card rounded-2xl p-5 flex flex-col">
+                <div class="mb-4">
+                    <h3 class="font-bold text-base flex items-center gap-2">
+                        <i class="fa-solid fa-stopwatch text-purple-400"></i>
+                        <span>답장 반응 속도 (중앙값, 분) & 선톡 횟수</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                        수면/업무 공백 왜곡을 제거하기 위해 동일 세션 내 응답 시간의 <strong>중앙값(Median)</strong>을 사용합니다.
+                    </p>
+                </div>
+                <div class="relative flex-1 min-h-[250px] w-full">
+                    <canvas id="chart-latency"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- 9. 화자별 상세 지표 순위 테이블 -->
+        <section class="glass-card rounded-2xl p-5 overflow-hidden">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                    <h3 class="font-bold text-base flex items-center gap-2">
+                        <i class="fa-solid fa-table-list text-amber-500"></i>
+                        <span>화자별 수다력 지수 및 상세 대화 역학 리포트</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                        컬럼 헤더를 클릭하면 해당 지표 기준으로 정렬됩니다. (프라이버시 모드 연동)
+                    </p>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button onclick="exportTableCSV()" class="px-3 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+                        <i class="fa-solid fa-download"></i>
+                        <span>분석 결과 CSV 저장</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto -mx-5 px-5">
+                <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold select-none">
+                            <th class="py-3 px-2.5">순위</th>
+                            <th class="py-3 px-2.5 cursor-pointer hover:text-amber-500" onclick="sortTable('user')">화자 이름 <i class="fa-solid fa-sort text-[10px] ml-0.5"></i></th>
+                            <th class="py-3 px-2.5">발화 스타일</th>
+                            <th class="py-3 px-2.5 cursor-pointer hover:text-amber-500 text-right" onclick="sortTable('cci')">
+                                종합 수다력 (CCI) <i class="fa-solid fa-sort text-[10px] ml-0.5"></i>
+                            </th>
+                            <th class="py-3 px-2.5 cursor-pointer hover:text-amber-500 text-right" onclick="sortTable('effChars')">
+                                유효 글자 수 <i class="fa-solid fa-sort text-[10px] ml-0.5"></i>
+                            </th>
+                            <th class="py-3 px-2.5 cursor-pointer hover:text-amber-500 text-right" onclick="sortTable('turnCount')">
+                                대화 턴 수 <i class="fa-solid fa-sort text-[10px] ml-0.5"></i>
+                            </th>
+                            <th class="py-3 px-2.5 cursor-pointer hover:text-amber-500 text-right" onclick="sortTable('msgCount')">
+                                단순 메시지 <i class="fa-solid fa-sort text-[10px] ml-0.5"></i>
+                            </th>
+                            <th class="py-3 px-2.5 cursor-pointer hover:text-amber-500 text-right" onclick="sortTable('burstRatio')" title="메시지 수 / 턴 수">
+                                버스트 <i class="fa-solid fa-sort text-[10px] ml-0.5"></i>
+                            </th>
+                            <th class="py-3 px-2.5 cursor-pointer hover:text-amber-500 text-right" onclick="sortTable('starterCount')">
+                                선톡 횟수 <i class="fa-solid fa-sort text-[10px] ml-0.5"></i>
+                            </th>
+                            <th class="py-3 px-2.5 cursor-pointer hover:text-amber-500 text-right" onclick="sortTable('enderCount')" title="본인 발언 후 6시간 이상 대화가 끊긴 횟수">
+                                갑분싸(종결) <i class="fa-solid fa-sort text-[10px] ml-0.5"></i>
+                            </th>
+                            <th class="py-3 px-2.5 cursor-pointer hover:text-amber-500 text-right" onclick="sortTable('dawnRatio')" title="새벽 01~05시 발화 비율">
+                                새벽 지분 <i class="fa-solid fa-sort text-[10px] ml-0.5"></i>
+                            </th>
+                            <th class="py-3 px-2.5 cursor-pointer hover:text-amber-500 text-right" onclick="sortTable('medianReplyMin')">
+                                답장 중앙값 <i class="fa-solid fa-sort text-[10px] ml-0.5"></i>
+                            </th>
+                            <th class="py-3 px-2.5">화자별 최애 키워드 TOP 3</th>
+                        </tr>
+                    </thead>
+                    <tbody id="speaker-table-body" class="divide-y divide-slate-200/60 dark:divide-slate-800/70">
+                        <!-- JS 렌더링 -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 10. 지표 설계 가이드 설명 -->
+        <section class="glass-card rounded-2xl p-5">
+            <h3 class="font-bold text-sm sm:text-base mb-3 flex items-center gap-2">
+                <i class="fa-solid fa-circle-info text-amber-500"></i>
+                <span>Argon Pro 수다력 & 케미 지표 산출 원리</span>
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                <div class="p-3.5 rounded-xl bg-slate-100/70 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-800">
+                    <div class="font-bold text-amber-600 dark:text-kakao-yellow mb-1">1. 종합 수다력 지수 (CCI)</div>
+                    단순 메시지 수만 세면 단문 연타가 과대평가됩니다. 유효 글자량(45%) + 대화 턴(30%) + 메시지 수(15%) + 선톡(10%) 가중합으로 진짜 대화 기여도를 계산합니다.
+                </div>
+                <div class="p-3.5 rounded-xl bg-slate-100/70 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-800">
+                    <div class="font-bold text-sky-500 mb-1">2. 티키타카 응답 전이 행렬</div>
+                    화자 A의 턴이 끝난 뒤 30분 이내에 화자 B가 바통을 이어받아 응답한 횟수와 전이 확률 $P(B|A)$를 계산해 단톡방 소울메이트와 비대칭 짝사랑 구조를 찾아냅니다.
+                </div>
+                <div class="p-3.5 rounded-xl bg-slate-100/70 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-800">
+                    <div class="font-bold text-cyan-500 mb-1">3. 프로 갑분싸러 & 선톡 개시자</div>
+                    특정 화자의 마지막 메시지 이후 6시간 이상 아무도 답장하지 않아 정적이 흐른 경우 해당 화자에게 '갑분싸(세션 종결)' 카운트가 부여되며, 그 침묵을 깬 사람에게 '선톡'이 부여됩니다.
+                </div>
+                <div class="p-3.5 rounded-xl bg-slate-100/70 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-800">
+                    <div class="font-bold text-indigo-400 mb-1">4. 프라이버시 마스킹 & 인원 필터</div>
+                    인스타그램이나 단톡방에 캡처 공유할 때 실명 노출을 막기 위해 '김OO' 또는 '익명 동물 별명'으로 즉시 치환할 수 있으며, 봇이나 나간 멤버를 클릭 한 번으로 통계에서 제외할 수 있습니다.
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 직접 텍스트 붙여넣기 모달 -->
+    <div id="raw-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div class="glass-card bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-paste text-amber-500"></i>
+                    <span>카카오톡 대화 내용 직접 붙여넣기</span>
+                </h3>
+                <button onclick="closeRawModal()" class="text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+                카카오톡 채팅방에서 복사한 대화 텍스트나 내보내기 파일의 일부를 아래에 붙여넣으세요.
+            </p>
+            <textarea id="raw-textarea" rows="10" class="w-full rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 p-3 text-xs font-mono focus:outline-none focus:border-amber-500" placeholder="--------------- 2026년 11월 11일 수요일 ---------------&#10;[김민준] [오후 1:10] 오늘 저녁 강남역 모임 다들 시간 괜찮으시죠?&#10;[이서연] [오후 1:11] 넵!! 저는 칼퇴하고 바로 갑니다 ㅎㅎ"></textarea>
+            <div class="flex justify-end gap-2">
+                <button onclick="closeRawModal()" class="px-4 py-2 rounded-xl text-xs font-semibold border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800">취소</button>
+                <button onclick="analyzePastedText()" class="px-4 py-2 rounded-xl text-xs font-bold bg-kakao-yellow text-kakao-brown hover:bg-yellow-300">분석 실행하기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 메인 스크립트 -->
+    <script>
+        // =========================================================================
+        // 전역 상태 관리
+        // =========================================================================
+        let allParsedMessages = [];    // 최초 파싱된 전체 원본 메시지 [{timestamp, user, text}]
+        let parsedMessages = [];       // 참여자 필터가 적용된 활성 메시지 배열
+        let excludedUsers = new Set(); // 분석에서 제외된 화자 집합
+        let allDetectedUsers = [];     // 최초 감지된 전체 화자 목록
+        let privacyMode = 'real';      // 'real' | 'masked' | 'animal'
+        let aliasMap = {};             // { realName: { real, masked, animal } }
+
+        let speakerStats = [];         // 화자별 집계 데이터 배열
+        let rallySessions = [];        // 연속 대화 랠리 세션 배열 (60분 이내 연속 티키타카)
+        let selectedRallyIndex = 0;    // 현재 선택된 마라톤 대화 탭 인덱스
+        let overallKeywords = [];      // 전체 대화 키워드 점유율 배열
+        let totalExtractedTokens = 0;  // 전체 유효 키워드 언급 총합
+
+        // 티키타카 & 시계열 데이터
+        let transitionMatrix = {};     // { fromUser: { toUser: { count, latencies: [] } } }
+        let timelineBuckets = [];      // [{ label, msgCount, turnCount, topKeyword }]
+        let longestSilenceHours = 0;
+        let longestSilencePeriod = '-';
+
+        let hourlyTotal = new Array(24).fill(0);
+        let hourlyByUser = {};
+        let currentSortKey = 'cci';
+        let currentSortAsc = false;
+
+        // Chart.js 인스턴스
+        let chartComparison = null;
+        let chartScatter = null;
+        let chartHourly = null;
+        let chartLatency = null;
+        let chartKeywordShare = null;
+        let chartTimeline = null;
+
+        // 화자별 고정 컬러 팔레트
+        const SPEAKER_COLORS = [
+            '#FEE500', // Kakao Yellow
+            '#38BDF8', // Sky 400
+            '#F43F5E', // Rose 500
+            '#34D399', // Emerald 400
+            '#A855F7', // Purple 500
+            '#FB923C', // Orange 400
+            '#818CF8', // Indigo 400
+            '#2DD4BF', // Teal 400
+            '#F472B6', // Pink 400
+            '#94A3B8'  // Slate 400
+        ];
+
+        // 익명 동물 별명 풀
+        const ANIMAL_ALIASES = [
+            '수다스러운 쿼카 🐹',
+            '타자치는 치타 🐆',
+            '냉철한 올빼미 🦉',
+            '해맑은 수달 🦦',
+            '감성적인 판다 🐼',
+            '신중한 사막여우 🦊',
+            '호기심 많은 미어캣 🐿️',
+            '느긋한 나무늘보 🦥',
+            '열정적인 레서판다 🐾',
+            '예리한 매 🦅',
+            '다정한 골든리트리버 🐶',
+            '도도한 고양이 🐱'
+        ];
+
+        // 표준 Argon 수다력 알고리즘 고정 상수
+        const STD_WEIGHTS = {
+            char: 0.45, // 유효 글자 수 비중 (45%)
+            turn: 0.30, // 대화 턴 수 비중 (30%)
+            msg:  0.15, // 단순 메시지 수 비중 (15%)
+            init: 0.10  // 선톡(세션 개시) 비중 (10%)
+        };
+        const STD_SESSION_GAP_HOURS = 6.0; // 선톡 및 갑분싸 판별 기준 공백 (6시간)
+        const RALLY_GAP_MINUTES = 60.0;    // 연속 마라톤 대화(Rally) 판별 공백 기준 (60분)
+        const TIKITAKA_WINDOW_MIN = 30.0;  // 티키타카 응답 인정 시간 창 (30분 이내 바통 터치)
+
+        // =========================================================================
+        // 프라이버시 이름 변환 헬퍼
+        // =========================================================================
+        function buildAliasMap(users) {
+            aliasMap = {};
+            users.forEach((u, idx) => {
+                let masked = u;
+                if (u.length >= 2) {
+                    masked = u.charAt(0) + 'O'.repeat(Math.min(2, u.length - 1));
+                } else {
+                    masked = u + 'O';
+                }
+                aliasMap[u] = {
+                    real: u,
+                    masked: masked,
+                    animal: ANIMAL_ALIASES[idx % ANIMAL_ALIASES.length]
+                };
+            });
+        }
+
+        function displayName(rawUser) {
+            if (!rawUser || rawUser === '-') return '-';
+            if (!aliasMap[rawUser]) return rawUser;
+            return aliasMap[rawUser][privacyMode] || rawUser;
+        }
+
+        function setPrivacyMode(mode) {
+            privacyMode = mode;
+            const modes = ['real', 'masked', 'animal'];
+            modes.forEach(m => {
+                const btn = document.getElementById(`privacy-btn-${m}`);
+                if (!btn) return;
+                if (m === mode) {
+                    btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-kakao-yellow text-kakao-brown shadow-sm';
+                } else {
+                    btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white';
+                }
+            });
+
+            renderParticipantFilterPills();
+            updateKPICards();
+            renderTikiTakaSection();
+            renderRallySection();
+            renderKeywordShareSection();
+            renderTable();
+            renderCharts();
+        }
+
+        // 참여자 제외/포함 토글
+        function toggleParticipant(user) {
+            const activeCount = allDetectedUsers.filter(u => !excludedUsers.has(u)).length;
+            if (!excludedUsers.has(user) && activeCount <= 1) {
+                showToast('최소 1명 이상의 참여자는 활성화되어 있어야 합니다.', 'error');
+                return;
+            }
+            if (excludedUsers.has(user)) {
+                excludedUsers.delete(user);
+            } else {
+                excludedUsers.add(user);
+            }
+            renderParticipantFilterPills();
+            reprocessCurrentData();
+        }
+
+        function renderParticipantFilterPills() {
+            const container = document.getElementById('participant-filter-pills');
+            if (!container) return;
+            container.innerHTML = '';
+
+            allDetectedUsers.forEach((user, idx) => {
+                const isExcluded = excludedUsers.has(user);
+                const color = SPEAKER_COLORS[idx % SPEAKER_COLORS.length];
+                const btn = document.createElement('button');
+                btn.onclick = () => toggleParticipant(user);
+                btn.className = isExcluded
+                    ? 'px-2.5 py-1 rounded-full text-xs font-medium bg-slate-200/50 dark:bg-slate-900 text-slate-400 line-through border border-slate-300 dark:border-slate-800 transition-all flex items-center gap-1.5 opacity-60 hover:opacity-100'
+                    : 'px-2.5 py-1 rounded-full text-xs font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-700 shadow-sm transition-all flex items-center gap-1.5 hover:border-amber-400';
+                btn.innerHTML = `
+                    <span class="w-2 h-2 rounded-full" style="background-color: ${isExcluded ? '#64748B' : color}"></span>
+                    <span>${escapeHtml(displayName(user))}</span>
+                    <i class="fa-solid ${isExcluded ? 'fa-plus text-[9px]' : 'fa-check text-[9px] text-emerald-400'}"></i>
+                `;
+                container.appendChild(btn);
+            });
+        }
+
+        // =========================================================================
+        // 한국어 핵심 키워드 추출기 (조사/어미 제거 및 불용어 필터링)
+        // =========================================================================
+        const KOREAN_STOPWORDS = new Set([
+            '사진', '동영상', '이모티콘', '삭제된', '메시지입니다', '보이스톡', '페이스톡', '투표', '공지',
+            '진짜', '너무', '그냥', '완전', '오늘', '내일', '어제', '지금', '내가', '나는', '제가', '저는',
+            '우리', '근데', '그래서', '그리고', '아니', '맞아', '맞아요', '뭔가', '약간', '이제', '다시',
+            '계속', '제일', '어떻게', '왜냐하면', '솔직히', '사실', '거의', '엄청', '되게', '일단', '혹시',
+            '그거', '이거', '저거', '여기', '거기', '저기', '어디', '언제', '누구', '무슨', '어떤', '이런',
+            '그런', '저런', '이렇게', '그렇게', '저렇게', '조금', '많이', '가장', '바로', '먼저', '같이',
+            '함께', '다들', '모두', '여러분', '이번', '다음', '지난', '그때', '이때', '시간', '생각', '사람',
+            '정도', '경우', '부분', '느낌', '말씀', '이야기', '얘기', '연락', '확인', '가능', '있어요', '없어요',
+            '같아요', '같습니다', '좋네요', '좋습니다', '좋아요', '네요', '군요', '습니다', '입니다', '합니다',
+            '해서', '하고', '하면', '했는데', '하는데', '할게요', '볼게요', '갈게요', '있는데', '없는데', '같은데',
+            '하는', '있는', '없는', '되는', '가는', '오는', '보는', '먹는', '하는거', '있는거', '같은', '위한',
+            '대한', '통해', '때문에', '덕분에', '아까', '나중', '조금만', '잠시만', '잠시만요', '잠깐',
+            '감사합니다', '고맙습니다', '고생하셨습니다', '수고하셨습니다', '안녕하세요', '반갑습니다', '찬성', '동의'
+        ]);
+
+        const SUFFIX_STRIP_REGEX = /(에서부터|으로부터|이라서|길래|던데|네요|어요|아요|여서|아서|어서|니까|으니까|지만|는데|은데|거나|이랑|하고|으로|에서|까지|부터|한테|에게|처럼|만큼|보다|라고|이라고|다는|라는|은|는|이|가|을|를|에|로|도|만|와|과|의|요|네|죠|지)$/;
+
+        function extractKeywordsFromText(text) {
+            if (!text) return [];
+            let cleaned = text.replace(/https?:\/\/\S+/gi, ' ');
+            if (/^(사진(\s*\d+장)?|동영상|이모티콘|\(이모티콘\)|삭제된 메시지입니다\.|보이스톡 해요|페이스톡 해요)$/.test(cleaned.trim())) {
+                return [];
+            }
+            cleaned = cleaned.replace(/[ㄱ-ㅎㅏ-ㅣ]+/g, ' ');
+            cleaned = cleaned.replace(/[^\uAC00-\uD7A3a-zA-Z0-9\s]/g, ' ');
+
+            const rawTokens = cleaned.split(/\s+/).filter(Boolean);
+            const validKeywords = [];
+
+            for (let token of rawTokens) {
+                if (/^\d+[시분초일월년명개번장원층차]?$/.test(token)) continue;
+                if (token.length < 2) continue;
+                if (KOREAN_STOPWORDS.has(token)) continue;
+
+                let stem = token;
+                if (token.length >= 3) {
+                    const stripped = token.replace(SUFFIX_STRIP_REGEX, '');
+                    if (stripped.length >= 2) {
+                        stem = stripped;
+                    }
+                }
+
+                if (/(했어|할까|인가|잖아|구나|더라|던가|할래|볼까|갈까|올까|줄게|할게|볼게|보시죠|갑시다|가보죠)$/.test(stem)) continue;
+                if (stem.length < 2 || KOREAN_STOPWORDS.has(stem)) continue;
+
+                validKeywords.push(stem);
+            }
+            return validKeywords;
+        }
+
+        // 토스트 알림 함수
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colorMap = {
+                info: 'bg-slate-900 dark:bg-slate-800 text-white border-amber-500/40',
+                success: 'bg-emerald-950/90 text-emerald-200 border-emerald-500/40',
+                error: 'bg-rose-950/90 text-rose-200 border-rose-500/40'
+            };
+            const iconMap = {
+                info: 'fa-circle-info text-amber-400',
+                success: 'fa-circle-check text-emerald-400',
+                error: 'fa-triangle-exclamation text-rose-400'
+            };
+
+            toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-lg text-xs font-medium backdrop-blur-md transition-all duration-300 ${colorMap[type] || colorMap.info}`;
+            toast.innerHTML = `
+                <i class="fa-solid ${iconMap[type] || iconMap.info} text-sm"></i>
+                <span>${message}</span>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-8px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+
+        // 리포트 PNG 이미지 캡처 (html2canvas)
+        async function captureReportImage() {
+            const target = document.getElementById('dashboard-capture-area');
+            if (!target || typeof html2canvas === 'undefined') {
+                showToast('이미지 캡처 모듈을 불러오지 못했습니다.', 'error');
+                return;
+            }
+            showToast('대시보드 고화질 리포트 이미지를 생성 중입니다...', 'info');
+            try {
+                const isDark = document.documentElement.classList.contains('dark');
+                const canvas = await html2canvas(target, {
+                    backgroundColor: isDark ? '#020617' : '#F8FAFC',
+                    scale: 1.5,
+                    useCORS: true,
+                    logging: false
+                });
+                const url = canvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `KakaoTalk_Argon_Report_${new Date().toISOString().slice(0, 10)}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                showToast('요약 리포트 PNG 이미지가 저장되었습니다!', 'success');
+            } catch (err) {
+                showToast('이미지 캡처 중 오류가 발생했습니다.', 'error');
+            }
+        }
+
+        // 다크/라이트 테마 전환
+        function toggleTheme() {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                icon.className = 'fa-solid fa-moon text-sm';
+            } else {
+                html.classList.add('dark');
+                icon.className = 'fa-solid fa-sun text-sm';
+            }
+            if (speakerStats.length > 0) {
+                renderCharts();
+            }
+        }
+
+        // 직접 입력 모달 열기/닫기
+        function openRawModal() {
+            const modal = document.getElementById('raw-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+        function closeRawModal() {
+            const modal = document.getElementById('raw-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+        function analyzePastedText() {
+            const raw = document.getElementById('raw-textarea').value.trim();
+            if (!raw) {
+                showToast('대화 텍스트를 입력해 주세요.', 'error');
+                return;
+            }
+            closeRawModal();
+            processRawContent(raw, '직접 붙여넣은 대화');
+        }
+
+        // 드래그 앤 드롭 이벤트 바인딩
+        const dropZone = document.getElementById('drop-zone');
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+            dropZone.addEventListener(evt, e => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+        });
+        ['dragenter', 'dragover'].forEach(evt => {
+            dropZone.addEventListener(evt, () => {
+                dropZone.classList.add('border-amber-500', 'bg-amber-500/10');
+            });
+        });
+        ['dragleave', 'drop'].forEach(evt => {
+            dropZone.addEventListener(evt, () => {
+                dropZone.classList.remove('border-amber-500', 'bg-amber-500/10');
+            });
+        });
+        dropZone.addEventListener('drop', e => {
+            const files = e.dataTransfer.files;
+            if (files && files.length > 0) {
+                readUploadedFile(files[0]);
+            }
+        });
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                readUploadedFile(file);
+            }
+        }
+
+        function readUploadedFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const buffer = e.target.result;
+                let text = new TextDecoder('utf-8').decode(buffer);
+                const brokenCount = (text.match(/\uFFFD/g) || []).length;
+                if (brokenCount > 5) {
+                    try {
+                        text = new TextDecoder('euc-kr').decode(buffer);
+                    } catch (err) {}
+                }
+                processRawContent(text, file.name);
+            };
+            reader.onerror = function() {
+                showToast('파일을 읽는 중 오류가 발생했습니다.', 'error');
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // =========================================================================
+        // 1. 다중 포맷 카카오톡 파서 (PC .txt / 모바일 .txt / PC .csv)
+        // =========================================================================
+        function parseKakaoTalkContent(rawText) {
+            const lines = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+            const messages = [];
+            let currentDate = null;
+
+            const pcDateRegex = /^-+\s*(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일.*-+$/;
+            const mobileDateHeaderRegex = /^(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일\s+[월화수목금토일]요일$/;
+            const pcMsgRegex = /^\[([^\]]+)\]\s*\[(오전|오후|AM|PM)\s*(\d{1,2}):(\d{2})\]\s*(.*)$/i;
+            const mobileMsgRegex = /^(\d{4})(?:년|\.)\s*(\d{1,2})(?:월|\.)\s*(\d{1,2})(?:일|\.)?\s*(?:(오전|오후|AM|PM)\s*)?(\d{1,2}):(\d{2}),\s*([^:]+?)\s*:\s*(.*)$/i;
+            const csvMsgRegex = /^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?),"?([^",]+)"?,(.*)$/;
+            const systemIgnoreRegex = /(님이 들어왔습니다|님이 나갔습니다|님을 초대했습니다|채팅방 관리자가|메시지가 가려졌습니다|운영정책을 위반한)/;
+
+            function buildTimestamp(y, m, d, ampm, hh, mm) {
+                let hour = parseInt(hh, 10);
+                const minute = parseInt(mm, 10);
+                if (ampm) {
+                    const upper = ampm.toUpperCase();
+                    if ((upper === '오후' || upper === 'PM') && hour < 12) hour += 12;
+                    if ((upper === '오전' || upper === 'AM') && hour === 12) hour = 0;
+                }
+                return new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10), hour, minute, 0);
+            }
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                if (i === 0 && /^Date,User,Message/i.test(line)) continue;
+
+                let mDate = line.match(pcDateRegex) || line.match(mobileDateHeaderRegex);
+                if (mDate) {
+                    currentDate = { y: mDate[1], m: mDate[2], d: mDate[3] };
+                    continue;
+                }
+
+                let mPc = line.match(pcMsgRegex);
+                if (mPc && currentDate) {
+                    const [, user, ampm, hh, mm, text] = mPc;
+                    if (systemIgnoreRegex.test(text)) continue;
+                    const ts = buildTimestamp(currentDate.y, currentDate.m, currentDate.d, ampm, hh, mm);
+                    messages.push({ timestamp: ts, user: user.trim(), text: text.trim() });
+                    continue;
+                }
+
+                let mMob = line.match(mobileMsgRegex);
+                if (mMob) {
+                    const [, y, mo, d, ampm, hh, mm, user, text] = mMob;
+                    if (systemIgnoreRegex.test(text)) continue;
+                    const ts = buildTimestamp(y, mo, d, ampm, hh, mm);
+                    messages.push({ timestamp: ts, user: user.trim(), text: text.trim() });
+                    continue;
+                }
+
+                let mCsv = line.match(csvMsgRegex);
+                if (mCsv) {
+                    const [, dtStr, user, rawMsg] = mCsv;
+                    let cleanMsg = rawMsg.trim();
+                    if (cleanMsg.startsWith('"') && cleanMsg.endsWith('"')) {
+                        cleanMsg = cleanMsg.slice(1, -1).replace(/""/g, '"');
+                    }
+                    if (systemIgnoreRegex.test(cleanMsg)) continue;
+                    const ts = new Date(dtStr.replace(' ', 'T'));
+                    if (!isNaN(ts.getTime())) {
+                        messages.push({ timestamp: ts, user: user.trim(), text: cleanMsg });
+                        continue;
+                    }
+                }
+
+                if (messages.length > 0 && !line.includes('저장한 날짜 :') && !line.includes('님과 카카오톡 대화')) {
+                    messages[messages.length - 1].text += '\n' + line;
+                }
+            }
+
+            return messages;
+        }
+
+        // =========================================================================
+        // 2. 대화 역학 지표, 기네스북, 티키타카 행렬, 월별 타임라인 계산 엔진
+        // =========================================================================
+        function processRawContent(rawText, sourceName) {
+            const msgs = parseKakaoTalkContent(rawText);
+            if (!msgs || msgs.length === 0) {
+                showToast('유효한 카카오톡 대화 패턴을 찾지 못했습니다. 포맷을 확인해 주세요.', 'error');
+                return;
+            }
+            allParsedMessages = msgs.sort((a, b) => a.timestamp - b.timestamp);
+            excludedUsers.clear();
+
+            // 화자 빈도순으로 전체 화자 목록 초기화 및 별명 매핑 생성
+            const freq = {};
+            allParsedMessages.forEach(m => { freq[m.user] = (freq[m.user] || 0) + 1; });
+            allDetectedUsers = Object.keys(freq).sort((a, b) => freq[b] - freq[a]);
+            buildAliasMap(allDetectedUsers);
+            renderParticipantFilterPills();
+
+            document.getElementById('current-file-badge').textContent = `${sourceName} (${allParsedMessages.length.toLocaleString()}건)`;
+            document.getElementById('current-file-badge').className = 'text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-500 dark:text-emerald-400 border border-emerald-500/30 font-semibold';
+
+            reprocessCurrentData();
+            showToast(`총 ${allParsedMessages.length.toLocaleString()}개의 메시지를 성공적으로 분석했습니다!`, 'success');
+        }
+
+        function reprocessCurrentData() {
+            parsedMessages = allParsedMessages.filter(m => !excludedUsers.has(m.user));
+            if (!parsedMessages || parsedMessages.length === 0) return;
+
+            const sessionGapHours = STD_SESSION_GAP_HOURS;
+            const mediaExactSet = new Set(['사진', '동영상', '이모티콘', '삭제된 메시지입니다.', '보이스톡 해요', '페이스톡 해요', '투표', '공지']);
+            const photoMultiRegex = /^사진\s*\d+장$/;
+            const emoticonAltRegex = /^\(이모티콘\)$/;
+
+            const userMap = {};
+            hourlyTotal = new Array(24).fill(0);
+            hourlyByUser = {};
+            transitionMatrix = {};
+
+            const globalKeywordMap = {};
+            totalExtractedTokens = 0;
+
+            const rawRallyList = [];
+            let currentRally = null;
+
+            longestSilenceHours = 0;
+            longestSilencePeriod = '-';
+
+            let prevTime = null;
+            let prevUser = null;
+
+            // 시계열 그룹핑 단위 결정 (전체 기간이 60일 이상이면 월별 YYYY-MM, 미만이면 일별 MM.DD)
+            const firstTs = parsedMessages[0].timestamp;
+            const lastTs = parsedMessages[parsedMessages.length - 1].timestamp;
+            const spanDays = (lastTs - firstTs) / (1000 * 60 * 60 * 24);
+            const useMonthlyBucket = spanDays >= 55;
+            const bucketMap = {};
+
+            const fmtDateShort = d => `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+            document.getElementById('current-period-badge').textContent = `기간: ${fmtDateShort(firstTs)} ~ ${fmtDateShort(lastTs)} (${Math.max(1, Math.round(spanDays))}일간)`;
+
+            for (let i = 0; i < parsedMessages.length; i++) {
+                const msg = parsedMessages[i];
+                const user = msg.user;
+                const ts = msg.timestamp;
+                const text = msg.text.trim();
+
+                if (!userMap[user]) {
+                    userMap[user] = {
+                        user,
+                        msgCount: 0,
+                        turnCount: 0,
+                        effChars: 0,
+                        rawChars: 0,
+                        mediaCount: 0,
+                        starterCount: 0,
+                        enderCount: 0,       // 갑분싸(세션 종결) 횟수
+                        dawnCount: 0,        // 새벽 01~05시 메시지 수
+                        reactionCount: 0,    // ㅋㅋㅋ/ㅎㅎ/ㅠㅠ/감탄 리액션 횟수
+                        questionCount: 0,    // 물음표(?) 질문 횟수
+                        linkCount: 0,        // URL 공유 횟수
+                        replyLatencies: [],
+                        uniqueTokens: new Set(),
+                        keywordCounts: {}
+                    };
+                    hourlyByUser[user] = new Array(24).fill(0);
+                    transitionMatrix[user] = {};
+                }
+
+                const uStat = userMap[user];
+                uStat.msgCount += 1;
+
+                // 시간대별 집계 및 새벽 올빼미(01:00 ~ 04:59) 판별
+                const hour = ts.getHours();
+                hourlyTotal[hour] += 1;
+                hourlyByUser[user][hour] += 1;
+                if (hour >= 1 && hour < 5) {
+                    uStat.dawnCount += 1;
+                }
+
+                // 리액션(ㅋㅋ/ㅎㅎ/ㅠㅠ/ㅜㅜ/!) 및 질문(?), 링크(http) 카운트
+                const laughMatches = text.match(/[ㅋㅎㅠㅜ]{2,}|!{2,}/g);
+                if (laughMatches) {
+                    uStat.reactionCount += laughMatches.length;
+                }
+                if (text.includes('?')) {
+                    uStat.questionCount += 1;
+                }
+                const urlMatches = text.match(/https?:\/\/\S+/gi);
+                if (urlMatches) {
+                    uStat.linkCount += urlMatches.length;
+                }
+
+                // 시간차 계산 (분 단위)
+                const diffMin = prevTime ? (ts - prevTime) / (1000 * 60) : Infinity;
+
+                // 최장 빙하기(침묵 시간) 갱신
+                if (prevTime && diffMin > longestSilenceHours * 60) {
+                    longestSilenceHours = Number((diffMin / 60).toFixed(1));
+                    longestSilencePeriod = `${fmtDateShort(prevTime)} → ${fmtDateShort(ts)}`;
+                }
+
+                // 세션 개시(선톡) 및 직전 화자 갑분싸(대화 종결) 판별
+                const isStarter = (i === 0) || (diffMin >= sessionGapHours * 60);
+                if (isStarter) {
+                    uStat.starterCount += 1;
+                    // 직전 메시지를 보낸 화자에게 갑분싸(세션 종결) 1회 부여
+                    if (i > 0 && prevUser && userMap[prevUser]) {
+                        userMap[prevUser].enderCount += 1;
+                    }
+                }
+
+                // 턴(Turn) 증가 여부: 화자가 바뀌었거나 새로운 세션이 시작된 경우
+                const isNewTurn = (user !== prevUser) || isStarter;
+                if (isNewTurn) {
+                    uStat.turnCount += 1;
+                }
+
+                // 답장 반응 지연 시간 및 티키타카 응답 전이(Transition Matrix) 기록
+                if (user !== prevUser && prevUser && !isStarter && diffMin >= 0 && diffMin < sessionGapHours * 60) {
+                    uStat.replyLatencies.push(diffMin);
+
+                    // 30분 이내 즉각 바통 터치인 경우 티키타카 전이로 카운트
+                    if (diffMin <= TIKITAKA_WINDOW_MIN) {
+                        if (!transitionMatrix[prevUser]) transitionMatrix[prevUser] = {};
+                        if (!transitionMatrix[prevUser][user]) {
+                            transitionMatrix[prevUser][user] = { count: 0, latencies: [] };
+                        }
+                        transitionMatrix[prevUser][user].count += 1;
+                        transitionMatrix[prevUser][user].latencies.push(diffMin);
+                    }
+                }
+
+                // 시계열 버킷 키 생성
+                const bKey = useMonthlyBucket
+                    ? `${ts.getFullYear()}-${String(ts.getMonth() + 1).padStart(2, '0')}`
+                    : `${String(ts.getMonth() + 1).padStart(2, '0')}.${String(ts.getDate()).padStart(2, '0')}`;
+                if (!bucketMap[bKey]) {
+                    bucketMap[bKey] = { label: bKey, msgCount: 0, turnCount: 0, kwCounts: {} };
+                }
+                bucketMap[bKey].msgCount += 1;
+                if (isNewTurn) bucketMap[bKey].turnCount += 1;
+
+                // 연속 마라톤 랠리 세션 그룹핑 (60분 이상 공백이면 새 랠리 세션 시작)
+                if (!currentRally || diffMin >= RALLY_GAP_MINUTES) {
+                    if (currentRally) rawRallyList.push(currentRally);
+                    currentRally = {
+                        startTime: ts,
+                        endTime: ts,
+                        messages: [],
+                        turnCount: 0,
+                        effChars: 0,
+                        userCounts: {},
+                        keywordCounts: {}
+                    };
+                }
+                currentRally.endTime = ts;
+                currentRally.messages.push(msg);
+                currentRally.userCounts[user] = (currentRally.userCounts[user] || 0) + 1;
+                if (currentRally.messages.length === 1 || user !== prevUser) {
+                    currentRally.turnCount += 1;
+                }
+
+                // 미디어/이모티콘 판별 및 키워드 추출
+                const isMedia = mediaExactSet.has(text) || photoMultiRegex.test(text) || emoticonAltRegex.test(text);
+                if (isMedia) {
+                    uStat.mediaCount += 1;
+                    if (text.includes('이모티콘')) uStat.reactionCount += 1;
+                } else {
+                    let cleaned = text.replace(/https?:\/\/\S+/g, '');
+                    cleaned = cleaned.replace(/([ㄱ-ㅎㅏ-ㅣ!?.~ㅋㅎㅠㅜ])\1{2,}/g, '$1$1');
+                    const noSpace = cleaned.replace(/\s+/g, '');
+                    uStat.effChars += noSpace.length;
+                    uStat.rawChars += text.replace(/\s+/g, '').length;
+                    currentRally.effChars += noSpace.length;
+
+                    const kws = extractKeywordsFromText(text);
+                    kws.forEach(kw => {
+                        uStat.uniqueTokens.add(kw);
+                        uStat.keywordCounts[kw] = (uStat.keywordCounts[kw] || 0) + 1;
+                        currentRally.keywordCounts[kw] = (currentRally.keywordCounts[kw] || 0) + 1;
+                        bucketMap[bKey].kwCounts[kw] = (bucketMap[bKey].kwCounts[kw] || 0) + 1;
+
+                        if (!globalKeywordMap[kw]) {
+                            globalKeywordMap[kw] = { keyword: kw, count: 0, byUser: {} };
+                        }
+                        globalKeywordMap[kw].count += 1;
+                        globalKeywordMap[kw].byUser[user] = (globalKeywordMap[kw].byUser[user] || 0) + 1;
+                        totalExtractedTokens += 1;
+                    });
+                }
+
+                prevTime = ts;
+                prevUser = user;
+            }
+            if (currentRally) rawRallyList.push(currentRally);
+            // 마지막 메시지 발화자에게도 세션 종료 1회 부여
+            if (prevUser && userMap[prevUser]) {
+                userMap[prevUser].enderCount += 1;
+            }
+
+            // 시계열 버킷 배열 완성
+            timelineBuckets = Object.values(bucketMap).map(b => {
+                const topKwEntry = Object.entries(b.kwCounts).sort((a, c) => c[1] - a[1])[0];
+                return {
+                    label: b.label,
+                    msgCount: b.msgCount,
+                    turnCount: b.turnCount,
+                    topKeyword: topKwEntry ? topKwEntry[0] : '-'
+                };
+            });
+
+            // 랠리 세션 점수화 및 정렬
+            rallySessions = rawRallyList.map(r => {
+                const durationMin = Math.max(1, Math.round((r.endTime - r.startTime) / (1000 * 60)));
+                const participants = Object.keys(r.userCounts);
+                let mvpUser = '-';
+                let mvpCount = 0;
+                Object.entries(r.userCounts).forEach(([u, c]) => {
+                    if (c > mvpCount) {
+                        mvpCount = c;
+                        mvpUser = u;
+                    }
+                });
+
+                const totalRallyKw = Object.values(r.keywordCounts).reduce((a, b) => a + b, 0) || 1;
+                const topKeywords = Object.entries(r.keywordCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 10)
+                    .map(([word, cnt]) => ({
+                        word,
+                        count: cnt,
+                        share: Number(((cnt / totalRallyKw) * 100).toFixed(1))
+                    }));
+
+                const rallyScore = (r.turnCount * 3) + (r.messages.length * 2) + (durationMin * 0.5);
+
+                return {
+                    ...r,
+                    durationMin,
+                    msgCount: r.messages.length,
+                    participants,
+                    mvpUser,
+                    mvpCount,
+                    topKeywords,
+                    rallyScore
+                };
+            }).sort((a, b) => b.rallyScore - a.rallyScore);
+
+            selectedRallyIndex = 0;
+
+            // 전체 키워드 점유율 정렬
+            const safeTotalKw = totalExtractedTokens || 1;
+            overallKeywords = Object.values(globalKeywordMap)
+                .sort((a, b) => b.count - a.count)
+                .map((item, idx) => {
+                    let topUser = '-';
+                    let topUserCount = 0;
+                    Object.entries(item.byUser).forEach(([u, c]) => {
+                        if (c > topUserCount) {
+                            topUserCount = c;
+                            topUser = u;
+                        }
+                    });
+                    return {
+                        rank: idx + 1,
+                        keyword: item.keyword,
+                        count: item.count,
+                        share: Number(((item.count / safeTotalKw) * 100).toFixed(2)),
+                        topUser,
+                        topUserCount,
+                        topUserShare: Number(((topUserCount / item.count) * 100).toFixed(0))
+                    };
+                });
+
+            // 화자별 파생 지표 계산
+            speakerStats = Object.values(userMap).map(u => {
+                const burstRatio = u.turnCount > 0 ? (u.msgCount / u.turnCount) : 1;
+                const charsPerTurn = u.turnCount > 0 ? (u.effChars / u.turnCount) : 0;
+                const enderRate = u.turnCount > 0 ? ((u.enderCount / u.turnCount) * 100) : 0;
+                const dawnRatio = u.msgCount > 0 ? ((u.dawnCount / u.msgCount) * 100) : 0;
+                const infoTriggerScore = u.questionCount + (u.linkCount * 2);
+
+                let medianReplyMin = null;
+                if (u.replyLatencies.length > 0) {
+                    const sorted = [...u.replyLatencies].sort((a, b) => a - b);
+                    const mid = Math.floor(sorted.length / 2);
+                    medianReplyMin = sorted.length % 2 !== 0
+                        ? sorted[mid]
+                        : (sorted[mid - 1] + sorted[mid]) / 2;
+                }
+
+                const topUserKeywords = Object.entries(u.keywordCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 3)
+                    .map(([word, cnt]) => ({ word, count: cnt }));
+
+                return {
+                    ...u,
+                    burstRatio: Number(burstRatio.toFixed(2)),
+                    charsPerTurn: Number(charsPerTurn.toFixed(1)),
+                    enderRate: Number(enderRate.toFixed(1)),
+                    dawnRatio: Number(dawnRatio.toFixed(1)),
+                    infoTriggerScore,
+                    medianReplyMin: medianReplyMin !== null ? Number(medianReplyMin.toFixed(1)) : null,
+                    topUserKeywords
+                };
+            });
+
+            calculateCCIAndRender();
+        }
+
+        function calculateCCIAndRender() {
+            if (!speakerStats || speakerStats.length === 0) return;
+
+            const { char: wChar, turn: wTurn, msg: wMsg, init: wInit } = STD_WEIGHTS;
+
+            const totalEffChars = speakerStats.reduce((s, u) => s + u.effChars, 0) || 1;
+            const totalTurns    = speakerStats.reduce((s, u) => s + u.turnCount, 0) || 1;
+            const totalMsgs     = speakerStats.reduce((s, u) => s + u.msgCount, 0) || 1;
+            const totalStarters = speakerStats.reduce((s, u) => s + u.starterCount, 0) || 1;
+
+            const avgBurst = speakerStats.reduce((s, u) => s + u.burstRatio, 0) / speakerStats.length;
+            const avgCPT   = speakerStats.reduce((s, u) => s + u.charsPerTurn, 0) / speakerStats.length;
+
+            speakerStats.forEach(u => {
+                u.charShare    = (u.effChars / totalEffChars) * 100;
+                u.turnShare    = (u.turnCount / totalTurns) * 100;
+                u.msgShare     = (u.msgCount / totalMsgs) * 100;
+                u.starterShare = (u.starterCount / totalStarters) * 100;
+
+                const cciRaw = (
+                    wChar * u.charShare +
+                    wTurn * u.turnShare +
+                    wMsg  * u.msgShare +
+                    wInit * u.starterShare
+                );
+                u.cci = Number(cciRaw.toFixed(2));
+
+                if (u.burstRatio >= Math.max(1.45, avgBurst * 1.05) && u.charsPerTurn < avgCPT) {
+                    u.styleTag = { label: '기관총 단타형', color: 'bg-rose-500/15 text-rose-400 border-rose-500/30', icon: 'fa-burst' };
+                } else if (u.charsPerTurn >= Math.max(22, avgCPT * 1.05) && u.burstRatio < avgBurst * 1.1) {
+                    u.styleTag = { label: '장문 논리형', color: 'bg-sky-500/15 text-sky-400 border-sky-500/20', icon: 'fa-align-left' };
+                } else if (u.burstRatio >= avgBurst && u.charsPerTurn >= avgCPT) {
+                    u.styleTag = { label: '핵심 헤비토커', color: 'bg-amber-500/15 text-amber-400 border-amber-500/30', icon: 'fa-fire' };
+                } else {
+                    u.styleTag = { label: '요약/리액션형', color: 'bg-slate-500/15 text-slate-400 border-slate-500/30', icon: 'fa-thumbs-up' };
+                }
+            });
+
+            const byCCI = [...speakerStats].sort((a, b) => b.cci - a.cci);
+            byCCI.forEach((u, idx) => {
+                const globalIdx = allDetectedUsers.indexOf(u.user);
+                u.color = SPEAKER_COLORS[(globalIdx >= 0 ? globalIdx : idx) % SPEAKER_COLORS.length];
+                u.cciRank = idx + 1;
+            });
+
+            updateKPICards();
+            renderTikiTakaSection();
+            renderRallySection();
+            renderKeywordShareSection();
+            renderTable();
+            renderCharts();
+        }
+
+        // =========================================================================
+        // 3. 명예의 전당 & 기네스북 8대 어워드 카드 업데이트
+        // =========================================================================
+        function updateKPICards() {
+            const topCCI = [...speakerStats].sort((a, b) => b.cci - a.cci)[0];
+            const topBurst = [...speakerStats].sort((a, b) => b.burstRatio - a.burstRatio)[0];
+            const topStarter = [...speakerStats].sort((a, b) => b.starterCount - a.starterCount)[0];
+            const validRepliers = speakerStats.filter(u => u.medianReplyMin !== null);
+            const topFast = validRepliers.sort((a, b) => a.medianReplyMin - b.medianReplyMin)[0];
+
+            // 기네스북 4종
+            const topEnder = [...speakerStats].sort((a, b) => b.enderCount - a.enderCount || b.enderRate - a.enderRate)[0];
+            const topOwl = [...speakerStats].sort((a, b) => b.dawnCount - a.dawnCount || b.dawnRatio - a.dawnRatio)[0];
+            const topReact = [...speakerStats].sort((a, b) => b.reactionCount - a.reactionCount)[0];
+            const topQuestion = [...speakerStats].sort((a, b) => b.infoTriggerScore - a.infoTriggerScore)[0];
+
+            // 1. 최고의 투머치토커
+            document.getElementById('kpi-top-cci-user').textContent = topCCI ? displayName(topCCI.user) : '-';
+            document.getElementById('kpi-top-cci-score').textContent = topCCI ? `종합 수다력 지분: ${topCCI.cci.toFixed(1)}%` : '-';
+            document.getElementById('kpi-top-cci-sub').textContent = topCCI ? `유효 글자 ${topCCI.effChars.toLocaleString()}자 · ${topCCI.turnCount.toLocaleString()}턴` : '-';
+
+            // 2. 기관총 단타왕
+            document.getElementById('kpi-top-burst-user').textContent = topBurst ? displayName(topBurst.user) : '-';
+            document.getElementById('kpi-top-burst-score').textContent = topBurst ? `1턴당 평균 ${topBurst.burstRatio}개 말풍선 연타` : '-';
+            document.getElementById('kpi-top-burst-sub').textContent = topBurst ? `총 ${topBurst.msgCount.toLocaleString()}건 발화 (${topBurst.turnCount}턴)` : '-';
+
+            // 3. 단톡방 산소호흡기
+            document.getElementById('kpi-top-starter-user').textContent = topStarter ? displayName(topStarter.user) : '-';
+            document.getElementById('kpi-top-starter-score').textContent = topStarter ? `전체 선톡의 ${topStarter.starterShare.toFixed(0)}% 담당` : '-';
+            document.getElementById('kpi-top-starter-sub').textContent = topStarter ? `6시간 이상 침묵을 깬 횟수 ${topStarter.starterCount}회` : '-';
+
+            // 4. 24시간 상주 칼답러
+            document.getElementById('kpi-top-fast-user').textContent = topFast ? displayName(topFast.user) : '-';
+            document.getElementById('kpi-top-fast-score').textContent = topFast ? `답장 속도 중앙값: ${topFast.medianReplyMin}분` : '-';
+            document.getElementById('kpi-top-fast-sub').textContent = topFast ? `총 ${topFast.replyLatencies.length}회 즉각 응답 기록` : '-';
+
+            // 5. 프로 갑분싸러
+            document.getElementById('kpi-top-ender-user').textContent = topEnder ? displayName(topEnder.user) : '-';
+            document.getElementById('kpi-top-ender-score').textContent = topEnder ? `대화를 얼려버린 횟수: ${topEnder.enderCount}회` : '-';
+            document.getElementById('kpi-top-ender-sub').textContent = topEnder ? `본인 턴 종료율 ${topEnder.enderRate}% (6시간 정적 유발)` : '-';
+
+            // 6. 새벽 감성 올빼미
+            document.getElementById('kpi-top-owl-user').textContent = topOwl && topOwl.dawnCount > 0 ? displayName(topOwl.user) : '해당 없음';
+            document.getElementById('kpi-top-owl-score').textContent = topOwl ? `새벽(01~05시) 발화: ${topOwl.dawnCount}건 (${topOwl.dawnRatio}%)` : '-';
+            document.getElementById('kpi-top-owl-sub').textContent = topOwl && topOwl.dawnCount > 0 ? `모두가 잠든 새벽을 지키는 올빼미` : '새벽 시간대 대화가 없습니다';
+
+            // 7. 단톡방 리액션 요정
+            document.getElementById('kpi-top-react-user').textContent = topReact ? displayName(topReact.user) : '-';
+            document.getElementById('kpi-top-react-score').textContent = topReact ? `웃음·감탄·이모티콘 리액션: ${topReact.reactionCount}회` : '-';
+            document.getElementById('kpi-top-react-sub').textContent = topReact ? `ㅋㅋㅋ·ㅎㅎ·ㅠㅠ·이모티콘 지분 1위` : '-';
+
+            // 8. 호기심 질문 & 정보통
+            document.getElementById('kpi-top-question-user').textContent = topQuestion ? displayName(topQuestion.user) : '-';
+            document.getElementById('kpi-top-question-score').textContent = topQuestion ? `질문 ${topQuestion.questionCount}회 · 링크 공유 ${topQuestion.linkCount}건` : '-';
+            document.getElementById('kpi-top-question-sub').textContent = topQuestion ? `단톡방 화제와 궁금증을 던지는 멤버` : '-';
+
+            // 타임라인 성수기 & 빙하기 배지 업데이트
+            if (timelineBuckets.length > 0) {
+                const peakBucket = [...timelineBuckets].sort((a, b) => b.msgCount - a.msgCount)[0];
+                document.getElementById('timeline-peak-badge').textContent = `${peakBucket.label} (${peakBucket.msgCount.toLocaleString()}건 · 핵심어 '${peakBucket.topKeyword}')`;
+            }
+            document.getElementById('timeline-ice-badge').textContent = longestSilenceHours > 0
+                ? `${longestSilenceHours}시간 침묵 (${longestSilencePeriod})`
+                : '-';
+        }
+
+        // =========================================================================
+        // 4. 🤝 티키타카 콤비 & 응답 케미 매트릭스 렌더링
+        // =========================================================================
+        function renderTikiTakaSection() {
+            const pairsContainer = document.getElementById('tiki-taka-top-pairs');
+            const asymContainer = document.getElementById('tiki-taka-asymmetric');
+            const matrixContainer = document.getElementById('transition-matrix-container');
+
+            pairsContainer.innerHTML = '';
+            asymContainer.innerHTML = '';
+            matrixContainer.innerHTML = '';
+
+            const users = [...speakerStats].sort((a, b) => b.cci - a.cci).slice(0, 7).map(u => u.user);
+            if (users.length < 2) {
+                pairsContainer.innerHTML = `<div class="text-xs text-slate-400">2명 이상의 대화 참여자가 필요합니다.</div>`;
+                return;
+            }
+
+            // 각 선행 화자 A별 전체 후속 응답 수 계산 (전이 확률 P(B|A) 분모)
+            const rowTotals = {};
+            users.forEach(a => {
+                let sum = 0;
+                users.forEach(b => {
+                    if (a !== b && transitionMatrix[a] && transitionMatrix[a][b]) {
+                        sum += transitionMatrix[a][b].count;
+                    }
+                });
+                rowTotals[a] = sum;
+            });
+
+            // 1) 쌍방향 소울메이트 페어 계산 (A <-> B)
+            const mutualPairs = [];
+            const asymmetricPairs = [];
+
+            for (let i = 0; i < users.length; i++) {
+                for (let j = i + 1; j < users.length; j++) {
+                    const uA = users[i];
+                    const uB = users[j];
+                    const abObj = (transitionMatrix[uA] && transitionMatrix[uA][uB]) ? transitionMatrix[uA][uB] : { count: 0, latencies: [] };
+                    const baObj = (transitionMatrix[uB] && transitionMatrix[uB][uA]) ? transitionMatrix[uB][uA] : { count: 0, latencies: [] };
+
+                    const totalPingPong = abObj.count + baObj.count;
+                    if (totalPingPong > 0) {
+                        const allLats = [...abObj.latencies, ...baObj.latencies];
+                        const avgLat = allLats.length > 0
+                            ? (allLats.reduce((s, v) => s + v, 0) / allLats.length).toFixed(1)
+                            : '-';
+                        mutualPairs.push({
+                            uA, uB,
+                            abCount: abObj.count,
+                            baCount: baObj.count,
+                            totalPingPong,
+                            avgLat
+                        });
+                    }
+
+                    // 비대칭 응답 확률 비교: P(B|A) vs P(A|B)
+                    const probBGivenA = rowTotals[uA] > 0 ? (abObj.count / rowTotals[uA]) * 100 : 0; // A가 말할 때 B가 답할 확률
+                    const probAGivenB = rowTotals[uB] > 0 ? (baObj.count / rowTotals[uB]) * 100 : 0; // B가 말할 때 A가 답할 확률
+                    const diffProb = Math.abs(probBGivenA - probAGivenB);
+
+                    if (totalPingPong >= 3 && diffProb >= 12) {
+                        if (probBGivenA > probAGivenB) {
+                            asymmetricPairs.push({
+                                speaker: uA,
+                                loyalResponder: uB,
+                                highProb: probBGivenA.toFixed(0),
+                                lowProb: probAGivenB.toFixed(0),
+                                diffProb
+                            });
+                        } else {
+                            asymmetricPairs.push({
+                                speaker: uB,
+                                loyalResponder: uA,
+                                highProb: probAGivenB.toFixed(0),
+                                lowProb: probBGivenA.toFixed(0),
+                                diffProb
+                            });
+                        }
+                    }
+                }
+            }
+
+            mutualPairs.sort((a, b) => b.totalPingPong - a.totalPingPong);
+            asymmetricPairs.sort((a, b) => b.diffProb - a.diffProb);
+
+            // 소울메이트 TOP 3 렌더링
+            const top3Mutual = mutualPairs.slice(0, 3);
+            if (top3Mutual.length === 0) {
+                pairsContainer.innerHTML = `<div class="text-xs text-slate-400">충분한 티키타카 응답 데이터가 없습니다.</div>`;
+            } else {
+                const medalColors = [
+                    'bg-kakao-yellow text-kakao-brown',
+                    'bg-sky-500/20 text-sky-400 border border-sky-500/30',
+                    'bg-amber-600/20 text-amber-400 border border-amber-500/30'
+                ];
+                top3Mutual.forEach((p, idx) => {
+                    const card = document.createElement('div');
+                    card.className = 'p-3 rounded-xl bg-slate-100/80 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-2';
+                    card.innerHTML = `
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <span class="w-6 h-6 rounded-lg font-extrabold text-xs flex items-center justify-center shrink-0 ${medalColors[idx]}">
+                                ${idx + 1}
+                            </span>
+                            <div class="min-w-0">
+                                <div class="font-extrabold text-xs sm:text-sm text-slate-800 dark:text-slate-100 truncate">
+                                    ${escapeHtml(displayName(p.uA))} <i class="fa-solid fa-arrows-left-right text-rose-400 mx-1 text-[11px]"></i> ${escapeHtml(displayName(p.uB))}
+                                </div>
+                                <div class="text-[11px] text-slate-500 dark:text-slate-400">
+                                    서로 주고받은 즉각 티키타카 <strong>${p.totalPingPong}회</strong> (${escapeHtml(displayName(p.uA))}→${escapeHtml(displayName(p.uB))} ${p.abCount}회 / 반대 ${p.baCount}회)
+                                </div>
+                            </div>
+                        </div>
+                        <span class="px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-500 dark:text-rose-400 border border-rose-500/20 font-mono font-bold text-xs shrink-0">
+                            평균 ${p.avgLat}분 컷
+                        </span>
+                    `;
+                    pairsContainer.appendChild(card);
+                });
+            }
+
+            // 짝사랑 레이더 렌더링
+            if (asymmetricPairs.length === 0) {
+                asymContainer.innerHTML = `<div>모든 멤버가 비교적 균등한 비율로 서로의 말을 받아주고 있는 평화로운 단톡방입니다!</div>`;
+            } else {
+                asymmetricPairs.slice(0, 2).forEach(ap => {
+                    const div = document.createElement('div');
+                    div.className = 'flex items-start gap-2';
+                    div.innerHTML = `
+                        <i class="fa-solid fa-bolt text-indigo-400 mt-1 text-[10px]"></i>
+                        <div>
+                            <strong>${escapeHtml(displayName(ap.speaker))}</strong>님이 말하면 <strong>${escapeHtml(displayName(ap.loyalResponder))}</strong>님이 <span class="text-indigo-500 dark:text-indigo-300 font-extrabold">${ap.highProb}%</span> 확률로 가장 먼저 받아치지만, 반대로 <strong>${escapeHtml(displayName(ap.loyalResponder))}</strong>님이 말할 때 <strong>${escapeHtml(displayName(ap.speaker))}</strong>님의 첫 응답률은 <span class="text-rose-400 font-bold">${ap.lowProb}%</span>입니다.
+                        </div>
+                    `;
+                    asymContainer.appendChild(div);
+                });
+            }
+
+            // 2) 히트맵 매트릭스 테이블 생성
+            let tableHtml = `<table class="w-full text-center border-collapse text-xs"><thead><tr>`;
+            tableHtml += `<th class="p-2 border border-slate-200 dark:border-slate-800 bg-slate-200/60 dark:bg-slate-900 text-[11px] text-slate-500">선행 발화 \\ 후속 응답</th>`;
+            users.forEach(uCol => {
+                tableHtml += `<th class="p-2 border border-slate-200 dark:border-slate-800 bg-slate-200/60 dark:bg-slate-900 font-bold text-slate-700 dark:text-slate-200 truncate max-w-[90px]">${escapeHtml(displayName(uCol))}</th>`;
+            });
+            tableHtml += `</tr></thead><tbody>`;
+
+            users.forEach(uRow => {
+                tableHtml += `<tr>`;
+                tableHtml += `<td class="p-2 border border-slate-200 dark:border-slate-800 bg-slate-200/40 dark:bg-slate-900/80 font-bold text-left text-slate-700 dark:text-slate-200 whitespace-nowrap">${escapeHtml(displayName(uRow))} <i class="fa-solid fa-arrow-right text-[9px] text-slate-400 ml-1"></i></td>`;
+
+                users.forEach(uCol => {
+                    if (uRow === uCol) {
+                        tableHtml += `<td class="p-2 border border-slate-200 dark:border-slate-800 bg-slate-200/30 dark:bg-slate-950/50 text-slate-400 font-mono text-[11px]">-</td>`;
+                    } else {
+                        const cnt = (transitionMatrix[uRow] && transitionMatrix[uRow][uCol]) ? transitionMatrix[uRow][uCol].count : 0;
+                        const prob = rowTotals[uRow] > 0 ? ((cnt / rowTotals[uRow]) * 100) : 0;
+                        const alpha = Math.min(0.85, Math.max(0.06, prob / 55));
+                        const bgStyle = cnt > 0
+                            ? `background-color: rgba(16, 185, 129, ${alpha.toFixed(2)});`
+                            : '';
+                        const textClass = prob >= 30 ? 'font-extrabold text-slate-950 dark:text-white' : 'text-slate-600 dark:text-slate-300';
+
+                        tableHtml += `
+                            <td class="p-2 border border-slate-200 dark:border-slate-800 matrix-cell ${textClass}" style="${bgStyle}" title="${escapeHtml(displayName(uRow))} 발화 후 ${escapeHtml(displayName(uCol))} 즉각 응답: ${cnt}회 (${prob.toFixed(1)}%)">
+                                <div class="font-mono font-bold text-xs">${prob.toFixed(0)}%</div>
+                                <div class="text-[10px] opacity-75 font-mono">(${cnt}회)</div>
+                            </td>
+                        `;
+                    }
+                });
+                tableHtml += `</tr>`;
+            });
+
+            tableHtml += `</tbody></table>`;
+            matrixContainer.innerHTML = tableHtml;
+        }
+
+        // =========================================================================
+        // 5. 대화가 가장 길게 이어진 순간 (Longest Rally Session) 렌더링
+        // =========================================================================
+        function selectRallyTab(idx) {
+            selectedRallyIndex = idx;
+            renderRallySection();
+        }
+
+        function renderRallySection() {
+            const tabsContainer = document.getElementById('rally-tabs-container');
+            tabsContainer.innerHTML = '';
+
+            if (!rallySessions || rallySessions.length === 0) return;
+
+            const topRallies = rallySessions.slice(0, 3);
+            topRallies.forEach((r, idx) => {
+                const isSelected = idx === selectedRallyIndex;
+                const m = r.startTime.getMonth() + 1;
+                const d = r.startTime.getDate();
+                const btn = document.createElement('button');
+                btn.onclick = () => selectRallyTab(idx);
+                btn.className = isSelected
+                    ? 'px-3 py-1.5 rounded-xl text-xs font-extrabold bg-kakao-yellow text-kakao-brown shadow-sm transition-all flex items-center gap-1.5'
+                    : 'px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-200/70 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 transition-all flex items-center gap-1.5';
+                btn.innerHTML = `
+                    <span>#${idx + 1}위 마라톤 (${m}/${d})</span>
+                    <span class="px-1.5 py-0.2 rounded-md text-[10px] ${isSelected ? 'bg-kakao-brown/15 text-kakao-brown' : 'bg-slate-300 dark:bg-slate-700'}">${r.msgCount}건</span>
+                `;
+                tabsContainer.appendChild(btn);
+            });
+
+            const active = topRallies[selectedRallyIndex] || topRallies[0];
+            const fmtDateTime = (dt) => {
+                const y = dt.getFullYear();
+                const m = String(dt.getMonth() + 1).padStart(2, '0');
+                const d = String(dt.getDate()).padStart(2, '0');
+                const hh = String(dt.getHours()).padStart(2, '0');
+                const mm = String(dt.getMinutes()).padStart(2, '0');
+                return `${y}.${m}.${d} ${hh}:${mm}`;
+            };
+            const fmtEndTime = (dt) => {
+                const hh = String(dt.getHours()).padStart(2, '0');
+                const mm = String(dt.getMinutes()).padStart(2, '0');
+                return `${hh}:${mm}`;
+            };
+
+            const durHours = Math.floor(active.durationMin / 60);
+            const durMins = active.durationMin % 60;
+            const durText = durHours > 0 ? `연속 ${durHours}시간 ${durMins}분 티키타카` : `연속 ${durMins}분 집중 대화`;
+
+            document.getElementById('rally-rank-badge').textContent = `#${selectedRallyIndex + 1} 레전드 마라톤 세션`;
+            document.getElementById('rally-datetime').textContent = `${fmtDateTime(active.startTime)} ~ ${fmtEndTime(active.endTime)}`;
+            document.getElementById('rally-duration-badge').textContent = durText;
+
+            document.getElementById('rally-msg-count').textContent = `${active.msgCount.toLocaleString()}건`;
+            document.getElementById('rally-turn-count').textContent = `${active.turnCount.toLocaleString()}턴`;
+            document.getElementById('rally-mvp-user').textContent = `${displayName(active.mvpUser)} (${active.mvpCount}건)`;
+            document.getElementById('rally-participants').textContent = `${active.participants.length}명 (${active.participants.map(u => displayName(u)).join(', ')})`;
+
+            const kwContainer = document.getElementById('rally-keywords-list');
+            kwContainer.innerHTML = '';
+            if (active.topKeywords.length === 0) {
+                kwContainer.innerHTML = `<span class="text-xs text-slate-400">추출된 핵심 명사 키워드가 없습니다.</span>`;
+            } else {
+                active.topKeywords.forEach((kw, kIdx) => {
+                    const pill = document.createElement('div');
+                    const isTop3 = kIdx < 3;
+                    pill.className = isTop3
+                        ? 'px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-600 dark:text-kakao-yellow font-bold text-xs flex items-center gap-1.5 shadow-sm'
+                        : 'px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center gap-1.5';
+                    pill.innerHTML = `
+                        <span class="text-[10px] opacity-75">#${kIdx + 1}</span>
+                        <span>${escapeHtml(kw.word)}</span>
+                        <span class="px-1.5 py-0.5 rounded-md text-[10px] bg-black/10 dark:bg-white/10 font-mono">${kw.count}회 (${kw.share}%)</span>
+                    `;
+                    kwContainer.appendChild(pill);
+                });
+            }
+
+            const previewContainer = document.getElementById('rally-chat-preview');
+            previewContainer.innerHTML = '';
+            const previewMsgs = active.messages.slice(0, 12);
+            const userColorMap = {};
+            speakerStats.forEach(s => { userColorMap[s.user] = s.color; });
+
+            previewMsgs.forEach(m => {
+                const hh = String(m.timestamp.getHours()).padStart(2, '0');
+                const mm = String(m.timestamp.getMinutes()).padStart(2, '0');
+                const bubble = document.createElement('div');
+                bubble.className = 'flex items-start gap-2 leading-relaxed';
+                const uColor = userColorMap[m.user] || '#38BDF8';
+                bubble.innerHTML = `
+                    <span class="font-bold shrink-0 px-1.5 py-0.5 rounded text-[11px]" style="background-color: ${uColor}22; color: ${uColor}; border: 1px solid ${uColor}44;">
+                        ${escapeHtml(displayName(m.user))}
+                    </span>
+                    <span class="text-slate-700 dark:text-slate-200 break-all flex-1">${escapeHtml(m.text)}</span>
+                    <span class="text-[10px] text-slate-400 shrink-0 font-mono">${hh}:${mm}</span>
+                `;
+                previewContainer.appendChild(bubble);
+            });
+
+            if (active.messages.length > 12) {
+                const more = document.createElement('div');
+                more.className = 'text-center text-[11px] text-slate-400 pt-1 font-medium';
+                more.textContent = `... 외 ${active.messages.length - 12}개의 말풍선이 숨 돌릴 틈 없이 이어졌습니다 🔥`;
+                previewContainer.appendChild(more);
+            }
+        }
+
+        // =========================================================================
+        // 6. 전체 대화 키워드 점유율 테이블 렌더링
+        // =========================================================================
+        function renderKeywordShareSection() {
+            document.getElementById('total-keywords-badge').textContent = `고유 키워드 ${overallKeywords.length.toLocaleString()}개 (총 ${totalExtractedTokens.toLocaleString()}회 언급)`;
+
+            const tbody = document.getElementById('keyword-share-tbody');
+            tbody.innerHTML = '';
+
+            const userColorMap = {};
+            speakerStats.forEach(s => { userColorMap[s.user] = s.color; });
+
+            const top30 = overallKeywords.slice(0, 30);
+            if (top30.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">추출된 키워드가 없습니다.</td></tr>`;
+                return;
+            }
+
+            const maxShare = top30[0].share || 1;
+
+            top30.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-200/40 dark:hover:bg-slate-800/40 transition-colors';
+                const barWidth = Math.max(6, Math.round((item.share / maxShare) * 100));
+                const uColor = userColorMap[item.topUser] || '#94A3B8';
+
+                tr.innerHTML = `
+                    <td class="py-2 px-2.5 font-mono text-slate-400 font-bold">#${item.rank}</td>
+                    <td class="py-2 px-2.5 font-extrabold text-slate-800 dark:text-slate-100">
+                        <span class="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-kakao-yellow border border-amber-500/20">
+                            ${escapeHtml(item.keyword)}
+                        </span>
+                    </td>
+                    <td class="py-2 px-2.5 text-right font-mono font-bold">${item.count.toLocaleString()}회</td>
+                    <td class="py-2 px-2.5 text-right">
+                        <div class="flex items-center justify-end gap-2">
+                            <div class="w-14 h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden hidden sm:block">
+                                <div class="h-full bg-sky-400 rounded-full" style="width: ${barWidth}%"></div>
+                            </div>
+                            <span class="font-mono font-bold text-sky-400">${item.share.toFixed(2)}%</span>
+                        </div>
+                    </td>
+                    <td class="py-2 px-2.5">
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${uColor}"></span>
+                            <span class="font-semibold">${escapeHtml(displayName(item.topUser))}</span>
+                            <span class="text-[11px] text-slate-400 font-mono">(${item.topUserCount}회 · ${item.topUserShare}%)</span>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // =========================================================================
+        // 7. 화자별 상세 테이블 정렬 및 렌더링
+        // =========================================================================
+        function sortTable(key) {
+            if (currentSortKey === key) {
+                currentSortAsc = !currentSortAsc;
+            } else {
+                currentSortKey = key;
+                currentSortAsc = (key === 'user' || key === 'medianReplyMin');
+            }
+            renderTable();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('speaker-table-body');
+            tbody.innerHTML = '';
+
+            const sorted = [...speakerStats].sort((a, b) => {
+                let va = a[currentSortKey];
+                let vb = b[currentSortKey];
+                if (va === null) va = Infinity;
+                if (vb === null) vb = Infinity;
+                if (typeof va === 'string') {
+                    return currentSortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+                }
+                return currentSortAsc ? va - vb : vb - va;
+            });
+
+            sorted.forEach(u => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-200/40 dark:hover:bg-slate-800/40 transition-colors';
+
+                const rankBadge = u.cciRank === 1
+                    ? `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-kakao-yellow text-kakao-brown font-extrabold text-xs">1</span>`
+                    : `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold text-xs">${u.cciRank}</span>`;
+
+                const replyText = u.medianReplyMin !== null ? `${u.medianReplyMin}분` : '-';
+
+                const favKeywordsHtml = (u.topUserKeywords && u.topUserKeywords.length > 0)
+                    ? u.topUserKeywords.map(k => `<span class="px-2 py-0.5 rounded-md bg-slate-200/70 dark:bg-slate-800 text-[11px] font-medium">${escapeHtml(k.word)} <strong class="text-amber-500 dark:text-kakao-yellow">${k.count}</strong></span>`).join(' ')
+                    : '<span class="text-slate-400 text-xs">-</span>';
+
+                tr.innerHTML = `
+                    <td class="py-3 px-2.5">${rankBadge}</td>
+                    <td class="py-3 px-2.5 font-bold flex items-center gap-2 whitespace-nowrap">
+                        <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${u.color}"></span>
+                        <span>${escapeHtml(displayName(u.user))}</span>
+                    </td>
+                    <td class="py-3 px-2.5 whitespace-nowrap">
+                        <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold border ${u.styleTag.color}">
+                            <i class="fa-solid ${u.styleTag.icon} mr-1"></i>${u.styleTag.label}
+                        </span>
+                    </td>
+                    <td class="py-3 px-2.5 text-right">
+                        <div class="flex items-center justify-end gap-2">
+                            <div class="w-14 h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden hidden sm:block">
+                                <div class="h-full bg-amber-400 rounded-full" style="width: ${Math.min(100, u.cci)}%"></div>
+                            </div>
+                            <span class="font-extrabold text-amber-500 dark:text-kakao-yellow">${u.cci.toFixed(2)}%</span>
+                        </div>
+                    </td>
+                    <td class="py-3 px-2.5 text-right font-mono">${u.effChars.toLocaleString()}자 <span class="text-[11px] text-slate-400">(${u.charShare.toFixed(1)}%)</span></td>
+                    <td class="py-3 px-2.5 text-right font-mono">${u.turnCount.toLocaleString()}턴 <span class="text-[11px] text-slate-400">(${u.turnShare.toFixed(1)}%)</span></td>
+                    <td class="py-3 px-2.5 text-right font-mono">${u.msgCount.toLocaleString()}건 <span class="text-[11px] text-slate-400">(${u.msgShare.toFixed(1)}%)</span></td>
+                    <td class="py-3 px-2.5 text-right font-mono font-semibold text-rose-400">${u.burstRatio.toFixed(2)}</td>
+                    <td class="py-3 px-2.5 text-right font-mono text-emerald-400">${u.starterCount}회 <span class="text-[11px] text-slate-400">(${u.starterShare.toFixed(0)}%)</span></td>
+                    <td class="py-3 px-2.5 text-right font-mono text-cyan-400">${u.enderCount}회 <span class="text-[11px] text-slate-400">(${u.enderRate}%)</span></td>
+                    <td class="py-3 px-2.5 text-right font-mono text-indigo-400">${u.dawnCount}건 <span class="text-[11px] text-slate-400">(${u.dawnRatio}%)</span></td>
+                    <td class="py-3 px-2.5 text-right font-mono">${replyText}</td>
+                    <td class="py-3 px-2.5 whitespace-nowrap flex items-center gap-1">${favKeywordsHtml}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/[&<>"']/g, m => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[m]));
+        }
+
+        // =========================================================================
+        // 8. Chart.js 시각화 렌더링 (6개 차트 - 프라이버시 모드 완벽 연동)
+        // =========================================================================
+        function renderCharts() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? '#94A3B8' : '#475569';
+            const gridColor = isDark ? 'rgba(148, 163, 184, 0.1)' : 'rgba(15, 23, 42, 0.08)';
+
+            const topSpeakers = [...speakerStats].sort((a, b) => b.cci - a.cci).slice(0, 10);
+            const labels = topSpeakers.map(u => displayName(u.user));
+
+            // 0) 월별/일별 타임라인 차트 (성수기 vs 빙하기)
+            const ctxTime = document.getElementById('chart-monthly-timeline').getContext('2d');
+            if (chartTimeline) chartTimeline.destroy();
+            chartTimeline = new Chart(ctxTime, {
+                type: 'bar',
+                data: {
+                    labels: timelineBuckets.map(b => b.label),
+                    datasets: [
+                        {
+                            label: '대화 말풍선 수 (건)',
+                            data: timelineBuckets.map(b => b.msgCount),
+                            backgroundColor: 'rgba(254, 229, 0, 0.75)',
+                            borderColor: '#EAB308',
+                            borderWidth: 1,
+                            borderRadius: 6,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: '티키타카 대화 턴 (회)',
+                            data: timelineBuckets.map(b => b.turnCount),
+                            type: 'line',
+                            borderColor: '#38BDF8',
+                            backgroundColor: '#38BDF8',
+                            borderWidth: 2.5,
+                            tension: 0.3,
+                            pointRadius: 4,
+                            yAxisID: 'y'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: textColor, font: { size: 11 } } },
+                        tooltip: {
+                            callbacks: {
+                                afterBody: items => {
+                                    const b = timelineBuckets[items[0].dataIndex];
+                                    return b ? `이 시기 핵심 키워드: #${b.topKeyword}` : '';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: textColor }, grid: { display: false } },
+                        y: { ticks: { color: textColor }, grid: { color: gridColor }, beginAtZero: true }
+                    }
+                }
+            });
+
+            // 1) CCI vs 유효 글자수 비중 vs 단순 메시지 비중 비교 바 차트
+            const ctxComp = document.getElementById('chart-cci-comparison').getContext('2d');
+            if (chartComparison) chartComparison.destroy();
+            chartComparison = new Chart(ctxComp, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: '종합 수다력 지수 (CCI %)',
+                            data: topSpeakers.map(u => Number(u.cci.toFixed(2))),
+                            backgroundColor: '#FEE500',
+                            borderColor: '#EAB308',
+                            borderWidth: 1,
+                            borderRadius: 6
+                        },
+                        {
+                            label: '유효 글자 수 점유율 (%)',
+                            data: topSpeakers.map(u => Number(u.charShare.toFixed(2))),
+                            backgroundColor: 'rgba(56, 189, 248, 0.75)',
+                            borderRadius: 6
+                        },
+                        {
+                            label: '단순 메시지 수 점유율 (%)',
+                            data: topSpeakers.map(u => Number(u.msgShare.toFixed(2))),
+                            backgroundColor: 'rgba(168, 85, 247, 0.65)',
+                            borderRadius: 6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: textColor, font: { family: 'Pretendard', size: 11 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}%`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: textColor }, grid: { display: false } },
+                        y: {
+                            ticks: { color: textColor, callback: v => v + '%' },
+                            grid: { color: gridColor },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // 2) 발화 스타일 버블 차트
+            const ctxScatter = document.getElementById('chart-style-scatter').getContext('2d');
+            if (chartScatter) chartScatter.destroy();
+            chartScatter = new Chart(ctxScatter, {
+                type: 'bubble',
+                data: {
+                    datasets: topSpeakers.map(u => ({
+                        label: displayName(u.user),
+                        data: [{
+                            x: u.charsPerTurn,
+                            y: u.burstRatio,
+                            r: Math.max(6, Math.min(26, u.cci * 0.65))
+                        }],
+                        backgroundColor: u.color + 'CC',
+                        borderColor: u.color,
+                        borderWidth: 2
+                    }))
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: textColor, boxWidth: 10, font: { size: 11 } }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => {
+                                    const u = topSpeakers[ctx.datasetIndex];
+                                    return `${displayName(u.user)} (${u.styleTag.label}) | 턴당 ${u.charsPerTurn}자, 버스트 ${u.burstRatio}, CCI ${u.cci}%`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: '턴당 평균 유효 글자 수 (장문 밀도 →)', color: textColor, font: { size: 11 } },
+                            ticks: { color: textColor },
+                            grid: { color: gridColor }
+                        },
+                        y: {
+                            title: { display: true, text: '버스트 지수 (연속 단타 횟수 ↑)', color: textColor, font: { size: 11 } },
+                            ticks: { color: textColor },
+                            grid: { color: gridColor }
+                        }
+                    }
+                }
+            });
+
+            // 3) 24시간 활성도 차트
+            const ctxHourly = document.getElementById('chart-hourly').getContext('2d');
+            if (chartHourly) chartHourly.destroy();
+            const hourLabels = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}시`);
+            chartHourly = new Chart(ctxHourly, {
+                type: 'line',
+                data: {
+                    labels: hourLabels,
+                    datasets: [
+                        {
+                            label: '전체 메시지 수',
+                            data: hourlyTotal,
+                            borderColor: '#34D399',
+                            backgroundColor: 'rgba(52, 211, 153, 0.15)',
+                            fill: true,
+                            tension: 0.35,
+                            pointRadius: 3
+                        },
+                        ...topSpeakers.slice(0, 3).map(u => ({
+                            label: displayName(u.user),
+                            data: hourlyByUser[u.user] || new Array(24).fill(0),
+                            borderColor: u.color,
+                            backgroundColor: 'transparent',
+                            borderDash: [4, 4],
+                            borderWidth: 1.5,
+                            tension: 0.35,
+                            pointRadius: 0
+                        }))
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: textColor, font: { size: 11 } } }
+                    },
+                    scales: {
+                        x: { ticks: { color: textColor, maxRotation: 0 }, grid: { display: false } },
+                        y: { ticks: { color: textColor }, grid: { color: gridColor }, beginAtZero: true }
+                    }
+                }
+            });
+
+            // 4) 답장 지연 시간 중앙값 & 선톡 횟수 복합 차트
+            const ctxLatency = document.getElementById('chart-latency').getContext('2d');
+            if (chartLatency) chartLatency.destroy();
+            chartLatency = new Chart(ctxLatency, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: '답장 소요 시간 중앙값 (분, 낮을수록 칼답)',
+                            data: topSpeakers.map(u => u.medianReplyMin ?? 0),
+                            backgroundColor: 'rgba(168, 85, 247, 0.7)',
+                            borderRadius: 6,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: '선톡(세션 개시) 횟수',
+                            data: topSpeakers.map(u => u.starterCount),
+                            type: 'line',
+                            borderColor: '#34D399',
+                            backgroundColor: '#34D399',
+                            borderWidth: 2,
+                            pointRadius: 4,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: textColor, font: { size: 11 } } }
+                    },
+                    scales: {
+                        x: { ticks: { color: textColor }, grid: { display: false } },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            title: { display: true, text: '답장 중앙값 (분)', color: textColor, font: { size: 10 } },
+                            ticks: { color: textColor },
+                            grid: { color: gridColor },
+                            beginAtZero: true
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            title: { display: true, text: '선톡 횟수 (회)', color: textColor, font: { size: 10 } },
+                            ticks: { color: textColor },
+                            grid: { display: false },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // 5) 전체 대화 키워드 점유율 TOP 15 수평 바 차트
+            const ctxKw = document.getElementById('chart-keyword-share').getContext('2d');
+            if (chartKeywordShare) chartKeywordShare.destroy();
+            const top15Kw = overallKeywords.slice(0, 15);
+            chartKeywordShare = new Chart(ctxKw, {
+                type: 'bar',
+                data: {
+                    labels: top15Kw.map(k => `${k.keyword} (${k.count}회)`),
+                    datasets: [{
+                        label: '전체 키워드 내 점유율 (%)',
+                        data: top15Kw.map(k => k.share),
+                        backgroundColor: top15Kw.map((_, idx) => idx < 3 ? '#FEE500' : 'rgba(56, 189, 248, 0.75)'),
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => {
+                                    const item = top15Kw[ctx.dataIndex];
+                                    return `점유율: ${item.share}% (총 ${item.count}회 언급 | 최다 언급: ${displayName(item.topUser)} ${item.topUserCount}회)`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: textColor, callback: v => v + '%' },
+                            grid: { color: gridColor },
+                            beginAtZero: true
+                        },
+                        y: {
+                            ticks: { color: textColor, font: { weight: 'bold', size: 11 } },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        // =========================================================================
+        // 9. 분석 결과 CSV 다운로드
+        // =========================================================================
+        function exportTableCSV() {
+            if (!speakerStats || speakerStats.length === 0) {
+                showToast('내보낼 분석 데이터가 없습니다.', 'error');
+                return;
+            }
+            const headers = [
+                '순위', '화자', '발화스타일', '종합수다력지수_CCI(%)',
+                '유효글자수', '유효글자점유율(%)', '대화턴수', '턴점유율(%)',
+                '단순메시지수', '메시지점유율(%)', '버스트지수(M/T)', '턴당유효글자수',
+                '선톡횟수', '갑분싸종결횟수', '새벽발화건수', '답장속도중앙값(분)', '미디어및이모티콘수'
+            ];
+            const rows = [...speakerStats].sort((a, b) => b.cci - a.cci).map(u => [
+                u.cciRank,
+                `"${displayName(u.user).replace(/"/g, '""')}"`,
+                u.styleTag.label,
+                u.cci.toFixed(2),
+                u.effChars,
+                u.charShare.toFixed(2),
+                u.turnCount,
+                u.turnShare.toFixed(2),
+                u.msgCount,
+                u.msgShare.toFixed(2),
+                u.burstRatio.toFixed(2),
+                u.charsPerTurn.toFixed(1),
+                u.starterCount,
+                u.enderCount,
+                u.dawnCount,
+                u.medianReplyMin ?? '',
+                u.mediaCount
+            ]);
+
+            const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `KakaoTalk_ArgonPro_Report_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('분석 리포트 CSV 파일이 다운로드되었습니다.', 'success');
+        }
+
+        // =========================================================================
+        // 10. 멀티시즌 5개월 단톡방 데모 데이터 생성기 (티키타카/올빼미/갑분싸/마라톤 완비)
+        // =========================================================================
+        function loadSampleData() {
+            const sampleLines = [];
+            const dayNames = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+
+            function formatAmPmTime(date) {
+                let h = date.getHours();
+                const m = String(date.getMinutes()).padStart(2, '0');
+                const ampm = h >= 12 ? '오후' : '오전';
+                if (h > 12) h -= 12;
+                if (h === 0) h = 12;
+                return `${ampm} ${h}:${m}`;
+            }
+
+            // 2026년 7월부터 11월까지 5개월간의 다양한 에피소드 구성
+            const episodes = [
+                // 7월: 여름 가평 빠지 & 바베큐 MT 계획
+                {
+                    y: 2026, m: 7, d: 11, h: 10, min: 20,
+                    logs: [
+                        ['김민준', 0, '여러분 7월 여름 휴가 시즌인데 우리 가평 빠지랑 바베큐 펜션 예약할까요?!'],
+                        ['이서연', 1, '헐'],
+                        ['이서연', 0, '가평 빠지 완전 좋아요ㅋㅋㅋㅋ'],
+                        ['이서연', 0, '수상레저 땅콩보트 타러 가요!!'],
+                        ['이서연', 0, '이모티콘'],
+                        ['김민준', 1, 'ㅋㅋㅋ 서연님 칼답 클라스! 제가 가평 독채 펜션 수영장 딸린 곳 링크 찾아봤어요 https://map.kakao.com/link/search/가평풀빌라'],
+                        ['이서연', 1, '우와'],
+                        ['이서연', 0, '수영장 진짜 넓다ㅠㅠㅠ'],
+                        ['이서연', 0, '저녁에 바베큐 파티로 목살이랑 삼겹살 구워 먹어요!!'],
+                        ['박지훈', 4, '가평 펜션 위치 확인했습니다. 토요일 오전에 출발하면 경춘고속도로가 많이 막히니 ITX 청춘열차를 타거나 아침 7시 전에 출발해서 가평 하나로마트에서 삼겹살이랑 바베큐 장을 보는 동선이 가장 효율적일 것 같습니다.'],
+                        ['최유진', 2, '지훈님 동선 정리 대박ㅋㅋㅋ 저는 가평 잣막걸리랑 하이볼 재료 챙겨갈게요!'],
+                        ['정우성', 6, '좋습니다 가평 펜션 예약금 얼마씩 보내면 될까요? (참고로 오늘 회사 서버 점검이라 제가 조금 조용할 수 있습니다...)']
+                    ]
+                },
+                // 7월 심야 새벽 올빼미 대화 (최유진 & 이서연 새벽 야식 토크)
+                {
+                    y: 2026, m: 7, d: 19, h: 1, min: 40,
+                    logs: [
+                        ['최유진', 0, '혹시 안 자는 사람...? 새벽 2시인데 배고파서 잠이 안 와요 ㅠㅠㅠ 치킨 시킬까 말까 고민 중...'],
+                        ['이서연', 1, '저요ㅋㅋㅋㅋ'],
+                        ['이서연', 0, '유진님 저도 지금 넷플릭스 보면서 야식 고민 중이었어요!!'],
+                        ['이서연', 0, '뿌링클이랑 교촌 허니콤보 중에 뭐 시키실 거예요?!'],
+                        ['최유진', 2, '역시 새벽엔 허니콤보에 웨지감자 조합이죠 ㅋㅋㅋ 아 다이어트는 내일부터 해야겠다'],
+                        ['최유진', 1, '배달앱 쿠폰 떴는데 혹시 링크 필요하세요? https://baemin.com/event'],
+                        ['이서연', 1, '헐 대박ㅋㅋㅋ'],
+                        ['이서연', 0, '저도 지금 치킨 결제 완료했습니다 ㅋㅋㅋㅋ 새벽 야식 최고!!'],
+                        ['정우성', 15, '새벽 2시에 치킨 알림 테러라니... 내일 아침 회의 다들 지각하지 마십쇼...']
+                    ]
+                },
+                // 8월: 무더위 & 강남역 방탈출 카페 번개
+                {
+                    y: 2026, m: 8, d: 14, h: 13, min: 10,
+                    logs: [
+                        ['김민준', 0, '오늘 서울 폭염주의보 떴는데 다들 살아계신가요? 주말에 시원하게 실내에서 강남역 방탈출 카페랑 보드게임 어때요?'],
+                        ['이서연', 1, '오 방탈출!!'],
+                        ['이서연', 0, '저 공포 테마 빼고 추리 테마 완전 좋아해요ㅋㅋㅋ'],
+                        ['이서연', 0, '강남역 제로월드 거기 예약 치열하던데 자리 있을까요?'],
+                        ['김민준', 2, '제가 방금 취소표 하나 주웠습니다 ㅋㅋㅋ 토요일 오후 4시 강남역 추리 테마 예약 성공!'],
+                        ['박지훈', 5, '강남역 방탈출 끝나면 저녁 6시쯤이니 근처 신논현역 쪽에서 시원하게 평양냉면이나 초계국수 먹고 보드게임 카페로 이동하면 더위도 피하고 딱 좋겠네요.'],
+                        ['최유진', 3, '방탈출 끝나고 보드게임 스플렌더랑 다빈치코드 내기 콜이요!! 지는 사람이 설빙 빙수 쏘기 ㅋㅋㅋ'],
+                        ['정우성', 8, '설빙 메론빙수 내기 좋습니다. 근데 제가 방탈출 자물쇠를 잘 못 푸는데 민폐 아닐지 걱정입니다.']
+                    ]
+                },
+                // 9월: 추석 연휴 & 가을 야구 직관 토크
+                {
+                    y: 2026, m: 9, d: 22, h: 18, min: 30,
+                    logs: [
+                        ['김민준', 0, '다들 퇴근길인가요? 다음 주 잠실야구장 가을야구 직관 티켓팅 성공했습니다!! 치맥하러 가실 분?!'],
+                        ['이서연', 1, '와아아아'],
+                        ['이서연', 0, '잠실야구장 직관이라니!!!!'],
+                        ['이서연', 0, '민준님 금손 인정합니다ㅋㅋㅋㅋㅋ'],
+                        ['이서연', 0, '야구장 치킨이랑 크림새우 무조건 먹어야 해요!!'],
+                        ['최유진', 2, '헐 저도 갈래요!! 야구장 응원석이면 유니폼 빌려서 입고 가야겠네요 ㅎㅎ'],
+                        ['김민준', 2, '오케이 1루 응원석 4연석이라 치킨이랑 맥주 사서 들어가면 딱입니다 ㅋㅋㅋ'],
+                        ['박지훈', 6, '잠실야구장 경기 시작이 6시 30분인데 당일 종합운동장역 주변이 엄청 혼잡할 테니 5시 40분까지는 야구장 정문 앞에서 모여서 치킨 픽업 후 입장하시죠.'],
+                        ['정우성', 10, '저는 그날 지방 출장이 잡혀 있어서 야구장은 패스하겠습니다... 재밌게 다녀오십쇼.']
+                    ]
+                },
+                // 10월: 새벽 올빼미 감성 토크 & 이직/자소서 상담
+                {
+                    y: 2026, m: 10, d: 9, h: 2, min: 15,
+                    logs: [
+                        ['최유진', 0, '새벽 2시 반인데 포트폴리오랑 이직 자소서 고치다가 현타 와서 카톡 켜봤어요... 아직 깨어 계신 올빼미 분 계신가요 ㅠㅠ'],
+                        ['최유진', 2, '경력직 면접 준비할 게 왜 이렇게 많은지 모르겠어요 ㅋㅋㅋ 커피를 너무 마셨나 잠이 안 오네요'],
+                        ['이서연', 3, '유진님 ㅠㅠㅠ'],
+                        ['이서연', 0, '새벽까지 포트폴리오 작업하느라 고생 많으세요!!'],
+                        ['이서연', 0, '유진님 실력이면 무조건 원하시는 판교 IT 대기업 합격하실 거예요!!'],
+                        ['최유진', 2, '서연님 천사 ㅠㅠ 새벽에 응원받으니까 갑자기 힘이 나네요!! 합격하면 제가 한우 쏩니다 진짜로!'],
+                        ['박지훈', 12, '유진님 새벽에 고생이 많으십니다. 혹시 기술 면접이나 이력서 프로젝트 성과 수치화 관련해서 첨삭 필요하시면 내일 점심시간에 편하게 파일 보내주세요. 제가 작년에 이직 준비할 때 정리해 둔 면접 질문 리스트도 같이 공유드리겠습니다.']
+                    ]
+                },
+                // 11월 (피크 성수기): 레전드 마라톤 랠리 세션 - 제주도 우정여행 & 연말 송년회 대폭발
+                {
+                    y: 2026, m: 11, d: 4, h: 21, min: 0,
+                    logs: [
+                        ['김민준', 0, '여러분 드디어 11월입니다!! 우리 벼르고 벼르던 제주도 우정여행 항공권이랑 숙소, 렌트카 지금 밤에 싹 다 확정 지어버릴까요?!'],
+                        ['이서연', 1, '오!!'],
+                        ['이서연', 0, '드디어 제주도 여행 총공세 시작인가요ㅋㅋㅋㅋ'],
+                        ['이서연', 0, '저 서귀포 오션뷰 독채 숙소 리스트 3군데 뽑아놨어요!!'],
+                        ['이서연', 0, '온수풀 수영장이랑 바베큐장 있는 숙소!!'],
+                        ['김민준', 1, '오 서연님 준비성 최고 ㅋㅋㅋ 일단 숙소 링크부터 공유해 주세요!'],
+                        ['이서연', 1, 'https://jeju-stay-sample.kr/oceanview'],
+                        ['이서연', 0, '여기 서귀포 숙소인데 흑돼지 바베큐 그릴도 무료 대여래요!!'],
+                        ['최유진', 2, '와 숙소 뷰 미쳤다... 제주도 바다 보면서 흑돼지 바베큐에 하이볼 마시면 올해 피로 다 풀리겠는데요?!'],
+                        ['박지훈', 3, '방금 김포-제주 항공권 시간대별로 조회해 봤는데, 금요일 오전 8시 50분 출발 편이 특가석이 딱 5자리 남아 있습니다. 렌트카는 5명이랑 캐리어 5개 실어야 하니 카니발 신형 완전자차 보험 포함으로 예약하는 게 가장 안전하고 쾌적할 것 같습니다.'],
+                        ['김민준', 2, '역시 지훈님 항공권이랑 카니발 렌트카 스펙 정리 깔끔하네요! 그럼 항공권은 금요일 8시 50분 비행기로 지금 각자 발권하고 렌트카랑 서귀포 숙소는 제가 대표로 결제할까요?'],
+                        ['이서연', 1, '완전 찬성이요!!'],
+                        ['이서연', 0, '민준님이랑 지훈님 덕분에 제주도 여행 준비 10분 만에 끝날 기세ㅋㅋㅋㅋ'],
+                        ['이서연', 0, '근데 우리 제주도 도착하자마자 첫 끼로 고기국수 먹을까요 아니면 갈치조림 먹을까요?'],
+                        ['최유진', 2, '공항 근처에서 자매국수 고기국수 호로록 먹고 애월 해안도로 드라이브하면서 오션뷰 카페 가는 코스 어때요?!'],
+                        ['김민준', 1, '애월 해안도로 카페 완전 좋죠!! 거기서 커피 마시고 협재 해수욕장 산책했다가 저녁에 서귀포 숙소 들어가기 전에 동문시장 들러서 딱새우회랑 흑돼지 포장해요!'],
+                        ['이서연', 1, '헐 동문시장 딱새우회!!!!'],
+                        ['이서연', 0, '저 딱새우회랑 전복김밥 진짜 사랑하는데ㅠㅠㅠ'],
+                        ['이서연', 0, '동문시장 야시장 털어봅시다ㅋㅋㅋㅋ'],
+                        ['박지훈', 4, '동선 아주 훌륭합니다. 첫째 날은 제주공항 → 고기국수 → 애월 카페 → 동문시장 딱새우회 픽업 → 서귀포 숙소 바베큐 파티로 가고, 둘째 날은 서귀포 통갈치조림 점심 식사 후 성산일출봉이나 우도 전기자전거 투어를 넣으면 이동 거리가 최소화됩니다.'],
+                        ['정우성', 3, '우도 땅콩아이스크림이랑 통갈치조림 코스 완벽하네요 👍 카니발 렌트카 운전은 제가 지훈님이랑 번갈아 가면서 맡겠습니다!'],
+                        ['최유진', 2, '우성님 운전 담당 든든합니다 ㅎㅎ 저는 제주도 감성 사진 찍을 필름카메라랑 블루투스 스피커 챙겨갈게요! 혹시 숙소에 보드게임도 가져갈까요?'],
+                        ['김민준', 1, '오 보드게임 무조건 챙겨야죠 ㅋㅋㅋ 서귀포 숙소 거실 넓으니까 밤새도록 마피아랑 스플렌더 달립시다!'],
+                        ['이서연', 1, 'ㅋㅋㅋㅋㅋ제주도 가서도 잠 못 자는 거 확정!!'],
+                        ['이서연', 0, '방금 김포-제주 8시 50분 항공권 결제 완료했습니다!!'],
+                        ['이서연', 0, '사진'],
+                        ['김민준', 2, '저도 항공권 발권 완료!! 서귀포 오션뷰 숙소 2박이랑 카니발 렌트카까지 방금 예약 확정 문자 받았습니다!'],
+                        ['최유진', 2, '저도 발권 완료했어요!! 아 제주도 여행 생각하니까 벌써 설레서 내일 출근할 힘이 나네요 ㅋㅋㅋ'],
+                        ['박지훈', 3, '저도 발권 마쳤습니다. 예약 내역과 시간표, 정산 금액은 노션 페이지로 정리해서 링크 올려두겠습니다. 다들 푹 쉬십시오!'],
+                        ['정우성', 5, '저도 항공권 결제 완료했습니다. 제주도 날씨만 맑기를 기도해 보겠습니다. 굿밤 되십쇼!']
+                    ]
+                },
+                // 11월 중순: 강남역 사전 모임 & 정산
+                {
+                    y: 2026, m: 11, d: 10, h: 12, min: 15,
+                    logs: [
+                        ['김민준', 0, '오늘 점심 맛있게 드셨나요? 이번 주 금요일 저녁 7시 강남역 숙성 삼겹살집에서 제주도 여행 사전 모임 있는 거 잊지 않으셨죠?!'],
+                        ['이서연', 1, '당연하죠!!'],
+                        ['이서연', 0, '금요일 강남역 삼겹살만 기다리고 있어요ㅋㅋㅋ'],
+                        ['이서연', 0, '볶음밥에 된장술밥까지 풀코스로 달릴 예정!!'],
+                        ['최유진', 2, '저도 금요일 칼퇴 장전 완료입니다 ㅎㅎ 강남역 몇 번 출구에서 만날까요?'],
+                        ['김민준', 1, '강남역 11번 출구 안쪽 골목으로 바로 오시면 됩니다! 제가 10분 먼저 가서 고기 불판 달구고 있을게요 ㅋㅋㅋ'],
+                        ['박지훈', 4, '금요일 저녁 7시 강남역 확인했습니다. 제주도 여행 세부 일정표 출력해서 가져가겠습니다.'],
+                        ['정우성', 9, '금요일 7시에 뵙겠습니다!']
+                    ]
+                }
+            ];
+
+            episodes.forEach(ep => {
+                const d = new Date(ep.y, ep.m - 1, ep.d, ep.h, ep.min, 0);
+                const dow = dayNames[d.getDay()];
+                sampleLines.push(`--------------- ${ep.y}년 ${ep.m}월 ${ep.d}일 ${dow} ---------------`);
+
+                ep.logs.forEach(([user, addMin, text]) => {
+                    d.setMinutes(d.getMinutes() + addMin);
+                    sampleLines.push(`[${user}] [${formatAmPmTime(d)}] ${text}`);
+                });
+            });
+
+            processRawContent(sampleLines.join('\n'), '데모 단톡방 (5개월 멀티시즌)');
+        }
+
+        // 페이지 로드 시 샘플 데이터로 자동 초기화
+        window.onload = function() {
+            loadSampleData();
+        };
+    </script>
+</body>
+</html>
